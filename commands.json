@@ -1,0 +1,10 @@
+{
+  "commands": {
+    "DeployToAppdata": {
+      "fileName": "cmd.exe",
+      "workingDirectory": ".",
+      "arguments": "/c DeployToAppdata.bat"
+    }
+  }
+, "-vs-binding":{"AfterBuild":["DeployToAppdata"]}
+}

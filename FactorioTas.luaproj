@@ -22,14 +22,34 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
-    <Content Include="info.json" />
+    <Content Include="FactorioTas\graphics\entity\arrow.png" />
+    <Content Include="FactorioTas\graphics\entity\arrow.xcf" />
+    <Content Include="FactorioTas\graphics\entity\build.png" />
+    <Content Include="FactorioTas\graphics\entity\build.xcf" />
+    <Content Include="FactorioTas\graphics\entity\line.png" />
+    <Content Include="FactorioTas\graphics\entity\line.xcf" />
+    <Content Include="FactorioTas\graphics\entity\waypoint.png" />
+    <Content Include="FactorioTas\graphics\entity\waypoint.xcf" />
+    <Content Include="FactorioTas\info.json" />
+    <Content Include="FactorioTas\locale\en\base.cfg" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="control.lua" />
-    <Compile Include="Data.lua" />
+    <Compile Include="FactorioTas\control.lua" />
+    <Compile Include="FactorioTas\data.lua" />
+    <Compile Include="FactorioTas\gui.lua" />
+    <Compile Include="FactorioTas\JSON.lua" />
+    <Compile Include="FactorioTas\prototypes\entity.lua" />
+    <Compile Include="FactorioTas\prototypes\recipe.lua" />
+    <Compile Include="FactorioTas\prototypes\item.lua" />
+    <Compile Include="FactorioTas\tas.lua" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="prototypes\" />
+    <Folder Include="FactorioTas\" />
+    <Folder Include="FactorioTas\graphics\" />
+    <Folder Include="FactorioTas\graphics\entity\" />
+    <Folder Include="FactorioTas\locale\" />
+    <Folder Include="FactorioTas\locale\en\" />
+    <Folder Include="FactorioTas\prototypes\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" />
 </Project>

@@ -5,6 +5,12 @@ VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{5697748A-77EF-44CA-8824-4F5637E5945B}") = "FactorioTas", "FactorioTas.luaproj", "{E439935D-B2A2-46AE-856D-2AA408428F33}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Build", "Build", "{946B0C09-2BC7-4AA1-984F-64D35BC5FAA4}"
+	ProjectSection(SolutionItems) = preProject
+		commands.json = commands.json
+		DeployToAppdata.bat = DeployToAppdata.bat
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
