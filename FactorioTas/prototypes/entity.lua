@@ -8,8 +8,9 @@ data:extend(
         -- subgroup = "grass",
         order = "a[tas]",
         -- collision_box = {{-1.1, -1.1}, {1.1, 1.1}},
+        collision_mask = {"water-tile" },
         selection_box = { { - 0.5, - 0.5 }, { 0.5, 0.5 } },
-        drawing_box = { { - 0.5, - 0.5 }, { 0.5, 0.5 } },
+        --drawing_box = { { - 0.5, - 0.5 }, { 0.5, 0.5 } },
         minable =
         {
             mining_particle = "stone-particle",
@@ -21,15 +22,15 @@ data:extend(
         -- {
         --  {item = "stone", probability = 1, count_min = 5, count_max = 10}
         -- },
-        mined_sound = { filename = "__base__/sound/deconstruct-bricks.ogg" },
         render_layer = "object",
+        mined_sound = { filename = "__base__/sound/deconstruct-bricks.ogg" },
         max_health = 1000,
         pictures =
         {
             {
                 filename = "__FactorioTas__/graphics/entity/waypoint.png",
-                width = 64,
-                height = 64
+                width = 32,
+                height = 32
             }
         }
     },
@@ -41,6 +42,7 @@ data:extend(
         -- subgroup = "grass",
         order = "a[tas]",
         -- collision_box = {{-1.1, -1.1}, {1.1, 1.1}},
+        collision_mask = { "water-tile" },
         selection_box = { { - 0.5, - 0.5 }, { 0.5, 0.5 } },
         minable =
         {
@@ -53,15 +55,15 @@ data:extend(
         -- {
         --  {item = "stone", probability = 1, count_min = 5, count_max = 10}
         -- },
-        mined_sound = { filename = "__base__/sound/deconstruct-bricks.ogg" },
         render_layer = "object",
+        mined_sound = { filename = "__base__/sound/deconstruct-bricks.ogg" },
         max_health = 1000,
         pictures =
         {
             {
                 filename = "__FactorioTas__/graphics/entity/build.png",
-                width = 64,
-                height = 64
+                width = 32,
+                height = 32
             }
         }
     },
@@ -73,8 +75,9 @@ data:extend(
         -- subgroup = "grass",
         order = "a[tas]",
         -- collision_box = {{-1.1, -1.1}, {1.1, 1.1}},
+        collision_mask = { "water-tile" },
         selection_box = { { - 0.5, - 0.5 }, { 0.5, 0.5 } },
-        drawing_box = { { - 0.5, - 0.5 }, { 0.5, 0.5 } },
+        --drawing_box = { { - 0.5, - 0.5 }, { 0.5, 0.5 } },
         minable =
         {
             mining_particle = "stone-particle",
@@ -93,8 +96,8 @@ data:extend(
         {
             {
                 filename = "__FactorioTas__/graphics/entity/line.png",
-                width = 64,
-                height = 64
+                width = 32,
+                height = 32
             }
         }
     },
@@ -106,8 +109,9 @@ data:extend(
         -- subgroup = "grass",
         order = "a[tas]",
         -- collision_box = {{-1.1, -1.1}, {1.1, 1.1}},
+        collision_mask = { "water-tile" },
         selection_box = { { - 0.5, - 0.5 }, { 0.5, 0.5 } },
-        drawing_box = { { - 0.5, - 0.5 }, { 0.5, 0.5 } },
+        --drawing_box = { { - 0.5, - 0.5 }, { 0.5, 0.5 } },
         minable =
         {
             mining_particle = "stone-particle",
@@ -126,8 +130,8 @@ data:extend(
         {
             {
                 filename = "__FactorioTas__/graphics/entity/arrow.png",
-                width = 64,
-                height = 64
+                width = 32,
+                height = 32
             }
         }
     }

@@ -63,8 +63,6 @@ function tas.gui.on_click(event)
         tas.gui.toggle_editor_visible(player_index)
     elseif name =="tas_editor_waypoint_visible_toggle" then
         
-    elseif name == "tas_editor_waypoint_add" then
-        tas.gui.toggle_waypoint_add(event.element, player_index)
     end
     
 end
