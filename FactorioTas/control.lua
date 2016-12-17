@@ -14,13 +14,6 @@ script.on_init( function()
     if err then msg_all( { "TAS-err-generic", err }) end
 end )
 
-
--- script.on_configuration_changed(function()
---    local _, err = pcall(tas.init_globals)
---    if err then msg_all({"tas-err-generic", err}) end
--- end)
-
-
 script.on_event(defines.events.on_player_created, function(event)
     local _, err = pcall(tas.on_player_created, event)
     if err then msg_all( { "TAS-err-specific", "on_player_created", err }) end

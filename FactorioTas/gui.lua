@@ -1,40 +1,44 @@
-global.gui = { }
 tas.gui = { }
 
 function tas.gui.init_player(player_index)
-    global.players[player_index].gui = { }
-    global.players[player_index].gui.is_editor_visible = false
+    local gui = { }
+    global.players[player_index].gui = gui
+    gui.is_editor_visible = false
 
-    game.players[player_index].gui.top.add { type = "button", name = "tas_editor_visible_toggle", caption = "TAS" }
+    gui.editor_visible_toggle = game.players[player_index].gui.top.add { type = "button", name = "tas_editor_visible_toggle", caption = "TAS" }
 end
 
 function tas.gui.show_editor(player_index)
+    local gui = global.players[player_index].gui
 
-    if global.players[player_index].gui.is_editor_visible == true then
+    if gui.is_editor_visible == true then
         return
     end
 
-    global.players[player_index].gui.is_editor_visible = true;
+    gui.is_editor_visible = true;
 
     local player = game.players[player_index]
 
-    local editor = player.gui.left.add { type = "frame", direction = "vertical", name = "tas_editor", caption = "TAS Editor" }
+    gui.editor = player.gui.left.add { type = "frame", direction = "vertical", name = "tas_editor", caption = "TAS Editor" }
 
-    editor.add { type = "label", caption = "waypoints" }
-    local waypoints = editor.add { type = "flow", direction = "horizontal" }
+    gui.editor.add { type = "label", caption = "waypoints" }
+    local waypoints = gui.editor.add { type = "flow", direction = "horizontal" }
 
-    waypoints.add { type = "button", name = "tas_editor_waypoint_visible_toggle", caption = "show/hide" }
+    gui.waypoints = {}
+    gui.waypoints.move = waypoints.add { type = "button", name = "tas_editor_waypoint_move_toggle", caption = "move" }
 
 end
 
 function tas.gui.hide_editor(player_index)
-    if global.players[player_index].gui.is_editor_visible == false then
+    local gui = global.players[player_index].gui
+
+    if gui.is_editor_visible == false then
         return
     end
 
-    global.players[player_index].gui.is_editor_visible = false
+    gui.is_editor_visible = false
 
-    game.players[player_index].gui.left.tas_editor.destroy()
+    gui.editor.destroy()
 end
 
 function tas.gui.toggle_editor_visible(player_index)
@@ -45,24 +49,30 @@ function tas.gui.toggle_editor_visible(player_index)
     end
 end
 
-function tas.gui.toggle_waypoint_add(element, player_index)
-    if tas.is_adding_waypoint(player_index) then
-        element.caption = "New"
-        tas.set_adding_waypoint(false)
-    else
-        element.caption = "X"
-        tas.set_adding_waypoint(true)
-    end
+function tas.gui.reset_waypoint_toggles(player_index)
+    local waypoints = global.players[player_index].gui.waypoints
+
+    waypoints.move.caption = "move"
 end
 
 function tas.gui.on_click(event)
-    local name = event.element.name
+    local element = event.element
     local player_index = event.player_index
+    local gui = global.players[player_index].gui
 
-    if name == "tas_editor_visible_toggle" then
-        tas.gui.toggle_editor_visible(player_index)
-    elseif name =="tas_editor_waypoint_visible_toggle" then
-        
-    end
+    local waypoints = gui.waypoints
     
+    if element == gui.editor_visible_toggle then
+        tas.gui.toggle_editor_visible(player_index)
+    elseif element == waypoints.move then
+        if gui.current_state == "move" then
+            tas.gui.reset_waypoint_toggles(player_index)
+            gui.current_state = nil
+        else
+            tas.gui.reset_waypoint_toggles(player_index)
+            gui.current_state = "move"
+            waypoints.move.caption = "X"
+        end
+    end
+
 end
