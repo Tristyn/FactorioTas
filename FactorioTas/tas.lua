@@ -81,9 +81,9 @@ function tas.find_waypoint_from_entity(waypoint_entity)
 end
 
 -- Makes the player select a new waypoint
--- If waypoint_index is nil or less than 1, the index is unselected
+-- If selected_player_waypoint_index is nil or less than 1, the index is unselected
 function tas.select_waypoint(player_index, selected_player_waypoint_index)
-    if selected_player_waypoint_index < 1 then
+    if selected_player_waypoint_index ~= nil and selected_player_waypoint_index < 1 then
         selected_player_waypoint_index = nil
     end
 
@@ -121,7 +121,7 @@ function tas.move_waypoint(player_index, waypoint_index, new_waypoint_entity)
 
     -- update waypoint highlights
     for _, player in pairs(global.players) do
-        if player.selected_player == player_index
+        if player.selected_player_index == player_index
             and player.selected_player_waypoint_index == waypoint_index
             and player.selected_waypoint_highlight_entity ~= nil then
             player.selected_waypoint_highlight_entity.destroy()
@@ -241,7 +241,7 @@ function tas.realign_sequence_indexes(player_index, sequence, start_index, shift
 
             -- selected waypoint underflow: select the first waypoint. or nothing if no waypoints exist in the sequence.
             if new_selected_waypoint < 1 then
-                if #global.players[player.selected_player].sequence > 0 then
+                if #global.players[player.selected_player_index].sequence > 0 then
                     new_selected_waypoint = 1
                 else
                     new_selected_waypoint = nil
