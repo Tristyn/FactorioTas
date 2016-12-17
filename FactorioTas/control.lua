@@ -35,3 +35,13 @@ script.on_event(defines.events.on_built_entity, function(event)
     local _, err = pcall(tas.on_built_entity, event)
     if err then msg_all( { "TAS-err-specific", "on_built_entity", err }) end
 end )
+
+script.on_event(defines.events.on_preplayer_mined_item, function(event)
+    local _, err = pcall(tas.on_pre_removing_entity, event)
+    if err then msg_all( { "TAS-err-specific", "on_preplayer_mined_item", err }) end
+end )
+
+script.on_event(defines.events.on_robot_pre_mined, function(event)
+    local _, err = pcall(tas.on_pre_removing_entity, event)
+    if err then msg_all( { "TAS-err-specific", "on_robot_pre_mined", err }) end
+end )

@@ -28,6 +28,8 @@
     <Content Include="FactorioTas\graphics\entity\build.xcf" />
     <Content Include="FactorioTas\graphics\entity\line.png" />
     <Content Include="FactorioTas\graphics\entity\line.xcf" />
+    <Content Include="FactorioTas\graphics\entity\waypoint-selected.png" />
+    <Content Include="FactorioTas\graphics\entity\waypoint-selected.xcf" />
     <Content Include="FactorioTas\graphics\entity\waypoint.png" />
     <Content Include="FactorioTas\graphics\entity\waypoint.xcf" />
     <Content Include="FactorioTas\info.json" />
