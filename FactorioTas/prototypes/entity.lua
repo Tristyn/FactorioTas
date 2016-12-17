@@ -9,7 +9,7 @@ data:extend(
         order = "a[tas]",
         -- collision_box = {{-1.1, -1.1}, {1.1, 1.1}},
         collision_mask = { "water-tile" },
-        selection_box = { { - 0.5, - 0.5 }, { 0.5, 0.5 } },
+        selection_box = { { - 0.4, - 0.4 }, { 0.4, 0.4 } },
         -- drawing_box = { { - 0.5, - 0.5 }, { 0.5, 0.5 } },
         minable =
         {
@@ -18,10 +18,6 @@ data:extend(
             result = "tas-waypoint",
             -- count = 20
         },
-        -- loot =
-        -- {
-        --  {item = "stone", probability = 1, count_min = 5, count_max = 10}
-        -- },
         render_layer = "object",
         mined_sound = { filename = "__base__/sound/deconstruct-bricks.ogg" },
         max_health = 1000,

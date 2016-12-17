@@ -41,6 +41,7 @@
     <Compile Include="FactorioTas\gui.lua" />
     <Compile Include="FactorioTas\JSON.lua" />
     <Compile Include="FactorioTas\prototypes\entity.lua" />
+    <Compile Include="FactorioTas\prototypes\hotkey.lua" />
     <Compile Include="FactorioTas\prototypes\recipe.lua" />
     <Compile Include="FactorioTas\prototypes\item.lua" />
     <Compile Include="FactorioTas\tas.lua" />

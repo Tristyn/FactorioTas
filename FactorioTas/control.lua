@@ -38,3 +38,8 @@ script.on_event(defines.events.on_robot_pre_mined, function(event)
     local _, err = pcall(tas.on_pre_removing_entity, event)
     if err then msg_all( { "TAS-err-specific", "on_robot_pre_mined", err }) end
 end )
+
+script.on_event("waypoint_select_hotkey", function(event)
+    local _, err = pcall(tas.on_left_click, event)
+    if err then msg_all( { "TAS-err-specific", "waypoint_select_hotkey", err }) end
+end )
