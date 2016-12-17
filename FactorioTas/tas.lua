@@ -208,7 +208,7 @@ function tas.on_pre_removing_waypoint(waypoint_entity)
     local indexes = tas.find_waypoint_from_entity(waypoint_entity)
 
     if indexes == nil then
-        msg_all( { "TAS-error-generic", "Could not locate data for waypoint entity. This should never happen. Stacktrace: " .. debug.traceback() })
+        msg_all( { "TAS-err-generic", "Could not locate data for waypoint entity. This should never happen. Stacktrace: " .. debug.traceback() })
         return
     end
 
@@ -238,6 +238,16 @@ function tas.realign_sequence_indexes(player_index, sequence, start_index, shift
         if player.selected_player_waypoint_index ~= nil
             and player.selected_player_waypoint_index >= start_index then
             local new_selected_waypoint = math.max(player.selected_player_waypoint_index + shift, start_index - 1)
+
+            -- selected waypoint underflow: select the first waypoint. or nothing if no waypoints exist in the sequence.
+            if new_selected_waypoint < 1 then
+                if #global.players[player.selected_player].sequence > 0 then
+                    new_selected_waypoint = 1
+                else
+                    new_selected_waypoint = nil
+                end
+            end
+
             tas.select_waypoint(player_index, new_selected_waypoint)
         end
     end
