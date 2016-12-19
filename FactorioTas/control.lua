@@ -1,5 +1,7 @@
+require "util"
 require "tas"
 require "gui"
+require "runner"
 
 json = require "JSON"
 

@@ -150,6 +150,38 @@ function tas.find_waypoint_insertion_index(selected_element, sequence)
     end
 end
 
+function tas.realign_sequence_indexes(player_index, sequence, start_index, shift)
+
+    -- realign selected waypoint index
+    for player_index, player in pairs(global.players) do
+        if player.selected_player_waypoint_index ~= nil
+            and player.selected_player_waypoint_index >= start_index then
+            local new_selected_waypoint = math.max(player.selected_player_waypoint_index + shift, start_index - 1)
+
+            -- selected waypoint underflow: select the first waypoint. or nothing if no waypoints exist in the sequence.
+            if new_selected_waypoint < 1 then
+                if #global.players[player.selected_player_index].sequence > 0 then
+                    new_selected_waypoint = 1
+                else
+                    new_selected_waypoint = nil
+                end
+            end
+
+            tas.select_waypoint(player_index, new_selected_waypoint)
+        end
+    end
+
+    -- realign waypoint entity text, skip entities < start_index
+    for i = start_index, #sequence do
+        local waypoint = sequence[i]
+        if waypoint.text_entity ~= nil then
+            waypoint.text_entity.destroy()
+            waypoint.text_entity = tas.create_static_text(waypoint.surface, waypoint.position, tas.integer_to_string(i))
+        end
+    end
+
+end
+
 function tas.insert_waypoint(waypoint_entity, player_index)
 
     local selected_player_index = global.players[player_index].selected_player_index
@@ -229,38 +261,6 @@ function tas.on_pre_removing_waypoint(waypoint_entity)
     -- All sequence elements after waypoint_index have been shifted left.
     -- Any stored sequence indexes > waypoint_index must be realigned.
     tas.realign_sequence_indexes(owner_index, sequence, waypoint_index, -1)
-end
-
-function tas.realign_sequence_indexes(player_index, sequence, start_index, shift)
-
-    -- realign selected waypoint index
-    for player_index, player in pairs(global.players) do
-        if player.selected_player_waypoint_index ~= nil
-            and player.selected_player_waypoint_index >= start_index then
-            local new_selected_waypoint = math.max(player.selected_player_waypoint_index + shift, start_index - 1)
-
-            -- selected waypoint underflow: select the first waypoint. or nothing if no waypoints exist in the sequence.
-            if new_selected_waypoint < 1 then
-                if #global.players[player.selected_player_index].sequence > 0 then
-                    new_selected_waypoint = 1
-                else
-                    new_selected_waypoint = nil
-                end
-            end
-
-            tas.select_waypoint(player_index, new_selected_waypoint)
-        end
-    end
-
-    -- realign waypoint entity text, skip entities < start_index
-    for i = start_index, #sequence do
-        local waypoint = sequence[i]
-        if waypoint.text_entity ~= nil then
-            waypoint.text_entity.destroy()
-            waypoint.text_entity = tas.create_static_text(waypoint.surface, waypoint.position, tas.integer_to_string(i))
-        end
-    end
-
 end
 
 function tas.on_pre_removing_entity(event)

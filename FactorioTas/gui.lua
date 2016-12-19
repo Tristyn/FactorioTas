@@ -21,11 +21,11 @@ function tas.gui.show_editor(player_index)
 
     gui.editor = player.gui.left.add { type = "frame", direction = "vertical", name = "tas_editor", caption = "TAS Editor" }
 
-    gui.editor.add { type = "label", caption = "waypoints" }
+    gui.editor.add { type = "label", caption = "Waypoint Mode:" }
     local waypoints = gui.editor.add { type = "flow", direction = "horizontal" }
 
     gui.waypoints = {}
-    gui.waypoints.move = waypoints.add { type = "button", name = "tas_editor_waypoint_move_toggle", caption = "move" }
+    gui.waypoints.move = waypoints.add { type = "button", name = "tas_editor_waypoint_move_toggle", caption = "insert" }
 
 end
 
@@ -52,7 +52,7 @@ end
 function tas.gui.reset_waypoint_toggles(player_index)
     local waypoints = global.players[player_index].gui.waypoints
 
-    waypoints.move.caption = "move"
+    waypoints.move.caption = "insert"
 end
 
 function tas.gui.on_click(event)
@@ -71,7 +71,7 @@ function tas.gui.on_click(event)
         else
             tas.gui.reset_waypoint_toggles(player_index)
             gui.current_state = "move"
-            waypoints.move.caption = "X"
+            waypoints.move.caption = "move"
         end
     end
 

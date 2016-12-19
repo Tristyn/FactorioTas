@@ -44,7 +44,9 @@
     <Compile Include="FactorioTas\prototypes\hotkey.lua" />
     <Compile Include="FactorioTas\prototypes\recipe.lua" />
     <Compile Include="FactorioTas\prototypes\item.lua" />
+    <Compile Include="FactorioTas\runner.lua" />
     <Compile Include="FactorioTas\tas.lua" />
+    <Compile Include="FactorioTas\util.lua" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="FactorioTas\" />
