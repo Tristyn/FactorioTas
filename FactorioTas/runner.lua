@@ -4,7 +4,7 @@ tas.runner.runners = { }
 -- Create a new runner and character entity
 -- Returns nil if sequence is empty
 function tas.runner.new_runner(sequence)
-    local start = sequence[1]
+    local start = sequence.waypoints[1]
 
     if start == nil then
         return nil
@@ -12,7 +12,7 @@ function tas.runner.new_runner(sequence)
 
     local runner = {
         sequence = sequence,
-        sequence_index = 1,
+        waypoint_index = 1,
         character = start.surface.create_entity { name = "player", position = start.position },
     }
 
@@ -49,8 +49,13 @@ function tas.runner.move_towards_waypoint(character, waypoint)
 end
 
 function tas.runner.step_runner(runner)
-    local waypoint = runner.sequence[runner.sequence_index]
+    local waypoint = runner.sequence.waypoints[runner.waypoint_index]
     local character = runner.character
+
+    -- check completion
+    if waypoint == nil then
+        return
+    end
 
     -- check construction
 
@@ -59,7 +64,7 @@ function tas.runner.step_runner(runner)
 
     -- check if waypoint goals are satisfied
     if runner.reached_waypoint == true then
-        runner.sequence_index = runner.sequence_index + 1
+        runner.waypoint_index = runner.waypoint_index + 1
         runner.reached_waypoint = false
     end
 end

@@ -63,6 +63,7 @@ function tas.gui.on_click(event)
     local waypoints = gui.waypoints
     
     if element == gui.editor_visible_toggle then
+        tas.ensure_first_sequence_initialized(true)
         tas.gui.toggle_editor_visible(player_index)
     elseif element == waypoints.move then
         if gui.current_state == "move" then

@@ -28,21 +28,97 @@ function tas.create_static_text(surface, position, content, color)
 end
 
 function tas.init_globals()
+    global.sequences = { }
     global.players = { }
 end
 
 function tas.on_player_created(event)
     local player_index = event.player_index
 
-    tas.log("debug", "initializing player: " .. player_index)
-
     global.players[player_index] = { }
-    global.players[player_index].sequence = { }
-    global.players[player_index].selected_player_index = player_index
+
+    --  select the first sequence if any exist
+    if #global.sequences > 0 then
+        global.players[player_index].selected_sequence_index = 1
+    end
 
     tas.gui.init_player(player_index)
 end
 
+-- creates a new sequence and returns it's index in the sequence table
+function tas.new_sequence(add_spawn_waypoint)
+    local sequence_index = #global.sequences + 1
+
+
+    local sequence = { waypoints = { } }
+
+    if add_spawn_waypoint == true then
+        local surface = game.surfaces["nauvis"]
+        local origin = { x = 0, y = 0 }
+
+        sequence.waypoints[1] =
+        {
+            type = "waypoint",
+            position = origin,
+            surface = surface,
+            entity = surface.create_entity { name = "tas-waypoint", position = origin },
+            text_entity = tas.create_static_text(surface,origin,"1")
+        }
+    end
+
+    global.sequences[sequence_index] = sequence
+
+    local final_waypoint_index = #sequence.waypoints
+    if final_waypoint_index == 0 then
+        final_waypoint_index = nil
+    end
+
+    -- if any sequences exist, players must have one selected
+    -- set their sequence if it is nil
+    for player_index, player in pairs(global.players) do
+        if player.selected_sequence_index == nil then
+            tas.select_waypoint(player_index, final_waypoint_index, sequence_index)
+        end
+    end
+
+    return sequence_index
+end
+
+function tas.ensure_first_sequence_initialized(add_spawn_waypoint)
+    if #global.sequences > 0 then
+        return
+    end
+
+    tas.new_sequence(add_spawn_waypoint)
+end
+
+function tas.realign_sequence_indexes(start_index, shift)
+
+    -- realign each players selected index
+    for _, player in pairs(global.players) do
+        if player.selected_sequence_index ~= nil
+            and player.selected_sequence_index >= start_index then
+            local new_selected_sequence = math.max(player.selected_sequence_index + shift, start_index - 1)
+
+            -- selected sequence underflow: select the first sequence. or unselect if no sequences exist.
+            if new_selected_sequence < 1 then
+                if #global.sequences > 0 then
+                    new_selected_sequence = 1
+                else
+                    new_selected_sequence = nil
+                end
+            end
+
+            tas.select_waypoint(player_index, new_selected_waypoint, new_selected_sequence)
+        end
+    end
+end
+
+function tas.remove_sequence(sequence_index)
+    table.remove(global.sequences, sequence_index)
+
+    tas.realign_sequence_indexes(sequence_index, -1)
+end
 
 -- Clone an entity to a lua table.
 -- The returned table will not be corrupted after the entity is deleted.
@@ -62,7 +138,7 @@ end
 -- scans a table for a value and returns its index
 -- returns nil if it doesn't exist
 function tas.scan_table_for_value(table, selector, value)
-    for key, val in ipairs(table) do
+    for key, val in pairs(table) do
         if value == selector(val) then
             return key
         end
@@ -71,24 +147,29 @@ end
 
 function tas.find_waypoint_from_entity(waypoint_entity)
     -- iterate all waypoints of all players to find a match
-    for player_index, player in pairs(global.players) do
+    for sequence_index, sequence in ipairs(global.sequences) do
 
-        waypoint_data_index = tas.scan_table_for_value(player.sequence, function(node) return node.entity end, waypoint_entity)
+        waypoint_data_index = tas.scan_table_for_value(sequence.waypoints, function(waypoint) return waypoint.entity end, waypoint_entity)
         if waypoint_data_index ~= nil then
-            return { player_index = player_index, waypoint_index = waypoint_data_index }
+            return { sequence_index = sequence_index, waypoint_index = waypoint_data_index }
         end
     end
 end
 
 -- Makes the player select a new waypoint
--- If selected_player_waypoint_index is nil or less than 1, the index is unselected
-function tas.select_waypoint(player_index, selected_player_waypoint_index)
-    if selected_player_waypoint_index ~= nil and selected_player_waypoint_index < 1 then
-        selected_player_waypoint_index = nil
+-- If selected_sequence_index is specified, the player will switch to that sequence. selected_sequence_index can not be nil
+-- If selected_sequence_waypoint_index is nil or less than 1, the index is unselected
+function tas.select_waypoint(player_index, selected_sequence_waypoint_index, selected_sequence_index)
+    local player = global.players[player_index]
+
+    if selected_sequence_waypoint_index ~= nil and selected_sequence_waypoint_index < 1 then
+        selected_sequence_waypoint_index = nil
     end
 
-    local player = global.players[player_index]
-    local selected_player = global.players[player.selected_player_index]
+    -- switch sequences
+    if selected_sequence_index ~= nil then
+        player.selected_sequence_index = selected_sequence_index
+    end
 
     -- Remove the old highlight
     if player.selected_waypoint_highlight_entity ~= nil then
@@ -96,18 +177,18 @@ function tas.select_waypoint(player_index, selected_player_waypoint_index)
     end
 
     player.selected_waypoint_highlight_entity = nil
-    player.selected_player_waypoint_index = selected_player_waypoint_index
+    player.selected_sequence_waypoint_index = selected_sequence_waypoint_index
 
-    if selected_player_waypoint_index == nil then return end
+    if selected_sequence_waypoint_index == nil then return end
 
     -- Create the 'highlight' entity
-    local waypoint_data = selected_player.sequence[selected_player_waypoint_index]
-    local new_highlight = waypoint_data.surface.create_entity { name = "tas-waypoint-selected", position = waypoint_data.position }
+    local waypoint = global.sequences[player.selected_sequence_index].waypoints[selected_sequence_waypoint_index]
+    local new_highlight = waypoint.surface.create_entity { name = "tas-waypoint-selected", position = waypoint.position }
     player.selected_waypoint_highlight_entity = new_highlight
 end
 
-function tas.move_waypoint(player_index, waypoint_index, new_waypoint_entity)
-    local waypoint = global.players[player_index].sequence[waypoint_index]
+function tas.move_waypoint(sequence_index, waypoint_index, new_waypoint_entity)
+    local waypoint = global.sequences[sequence_index].waypoints[waypoint_index]
 
     if waypoint.entity ~= nil then
         waypoint.entity.destroy()
@@ -121,8 +202,8 @@ function tas.move_waypoint(player_index, waypoint_index, new_waypoint_entity)
 
     -- update waypoint highlights
     for _, player in pairs(global.players) do
-        if player.selected_player_index == player_index
-            and player.selected_player_waypoint_index == waypoint_index
+        if player.selected_sequence_index == sequence_index
+            and player.selected_sequence_waypoint_index == waypoint_index
             and player.selected_waypoint_highlight_entity ~= nil then
             player.selected_waypoint_highlight_entity.destroy()
             player.selected_waypoint_highlight_entity = new_waypoint_entity.surface.create_entity { name = "tas-waypoint-selected", position = new_waypoint_entity.position }
@@ -130,11 +211,22 @@ function tas.move_waypoint(player_index, waypoint_index, new_waypoint_entity)
     end
 end
 
--- Finds the location in the sequence in which a new waypoint should be placed.
--- Returns the index, or nil if  
-function tas.find_waypoint_insertion_index(selected_element, sequence)
+-- Finds the location in the sequence in which a new waypoint should be placed based on the state of the player.
+-- Returns nil if a waypoint can't currently be placed.
+function tas.find_waypoint_insertion_index(player_index)
+    local player = global.players[player_index]
+    local sequence = global.sequences[player.selected_sequence_index]
+    local selected_waypoint_index = player.selected_sequence_waypoint_index
+
+    if sequence == nil or selected_waypoint_index == nil then
+        return nil
+    end
+
+
+    local selected_waypoint = sequence.waypoints[selected_waypoint_index]
+
     if selected_element == nil then
-        if #sequence > 0 then
+        if #waypoints > 0 then
             -- If waypoints already exist, one must be selected.
             return nil
         end
@@ -146,21 +238,21 @@ function tas.find_waypoint_insertion_index(selected_element, sequence)
         --    return tas.scan_table_for_value(sequence, function(val) return val end, selected_element)
 
     elseif selected_element.type == "waypoint" then
-        return tas.scan_table_for_value(sequence, function(val) return val end, selected_element) + 1
+        return tas.scan_table_for_value(waypoints, function(waypoint) return waypoint end, selected_element) + 1
     end
 end
 
-function tas.realign_sequence_indexes(player_index, sequence, start_index, shift)
+function tas.realign_waypoint_indexes(sequence_index, start_index, shift)
 
     -- realign selected waypoint index
     for player_index, player in pairs(global.players) do
-        if player.selected_player_waypoint_index ~= nil
-            and player.selected_player_waypoint_index >= start_index then
-            local new_selected_waypoint = math.max(player.selected_player_waypoint_index + shift, start_index - 1)
+        if player.selected_sequence_waypoint_index ~= nil
+            and player.selected_sequence_waypoint_index >= start_index then
+            local new_selected_waypoint = math.max(player.selected_sequence_waypoint_index + shift, start_index - 1)
 
             -- selected waypoint underflow: select the first waypoint. or nothing if no waypoints exist in the sequence.
             if new_selected_waypoint < 1 then
-                if #global.players[player.selected_player_index].sequence > 0 then
+                if #global.sequences[player.selected_sequence_index].waypoints > 0 then
                     new_selected_waypoint = 1
                 else
                     new_selected_waypoint = nil
@@ -171,9 +263,11 @@ function tas.realign_sequence_indexes(player_index, sequence, start_index, shift
         end
     end
 
+    local waypoints = global.sequences[sequence_index].waypoints
+
     -- realign waypoint entity text, skip entities < start_index
-    for i = start_index, #sequence do
-        local waypoint = sequence[i]
+    for i = start_index, #waypoints do
+        local waypoint = waypoints[i]
         if waypoint.text_entity ~= nil then
             waypoint.text_entity.destroy()
             waypoint.text_entity = tas.create_static_text(waypoint.surface, waypoint.position, tas.integer_to_string(i))
@@ -184,15 +278,17 @@ end
 
 function tas.insert_waypoint(waypoint_entity, player_index)
 
-    local selected_player_index = global.players[player_index].selected_player_index
-    local selected_player = global.players[selected_player_index]
-    local selected_waypoint_index = global.players[player_index].selected_player_waypoint_index
-    local selected_waypoint = selected_player.sequence[selected_waypoint_index]
-    local sequence = selected_player.sequence
+    local sequence_index = global.players[player_index].selected_sequence_index
+    local sequence = global.sequences[sequence_index]
     local player = global.players[player_index]
     local player_entity = game.players[player_index]
 
-    local sequence_insert_index = tas.find_waypoint_insertion_index(selected_waypoint, sequence)
+    local sequence_insert_index
+    if #sequence.waypoints > 0 then
+        sequence_insert_index = player.selected_sequence_waypoint_index + 1
+    else
+        sequence_insert_index = 1
+    end
 
     if sequence_insert_index == nil then
         player_entity.print( { "TAS-warning-generic", "Please select a waypoint before placing a new one" })
@@ -204,8 +300,10 @@ function tas.insert_waypoint(waypoint_entity, player_index)
 
     local waypoint_data = { type = "waypoint", position = waypoint_entity.position, surface = waypoint_entity.surface, entity = waypoint_entity, text_entity = waypoint_text_entity }
     table.insert(sequence, sequence_insert_index, waypoint_data)
-
-    tas.realign_sequence_indexes(selected_player_index, sequence, sequence_insert_index, 1)
+    game.print("before selected " .. global.players[player_index].selected_sequence_waypoint_index)
+    tas.realign_waypoint_indexes(sequence_index, sequence_insert_index, 1)
+    game.print("after selected " .. global.players[player_index].selected_sequence_waypoint_index)
+    game.print("local selected " .. sequence_insert_index)
 
     tas.select_waypoint(player_index, sequence_insert_index)
 end
@@ -213,14 +311,16 @@ end
 function tas.on_built_waypoint(created_entity, player_index)
     created_entity.destructible = false
 
-    local selected_player_index = global.players[player_index].selected_player_index
-    local selected_player = global.players[selected_player_index]
-    local selected_waypoint_index = global.players[player_index].selected_player_waypoint_index
-    local selected_waypoint = selected_player.sequence[selected_waypoint_index]
+    tas.ensure_first_sequence_initialized(true)
+
     local player = global.players[player_index]
+    local sequence_index = player.selected_sequence_index
+    local selected_waypoint_index = player.selected_sequence_waypoint_index
+    local sequence = global.sequences[sequence_index]
+    local selected_waypoint = sequence.waypoints[selected_waypoint_index]
 
     if player.gui.current_state == "move" then
-        tas.move_waypoint(selected_player_index, selected_waypoint_index, created_entity)
+        tas.move_waypoint(sequence_index, selected_waypoint_index, created_entity)
     else
         tas.insert_waypoint(created_entity, player_index)
     end
@@ -244,23 +344,22 @@ function tas.on_pre_removing_waypoint(waypoint_entity)
         return
     end
 
+    local waypoints = global.sequences[indexes.sequence_index].waypoints
     local waypoint_index = indexes.waypoint_index
-    local sequence = global.players[indexes.player_index].sequence
+    local waypoint = waypoints[waypoint_index]
 
     -- Clean up waypoint data entry and floating text entity
-    local waypoint = sequence[waypoint_index]
-
     if waypoint.text_entity ~= nil then
         waypoint.text_entity.destroy()
         waypoint.text_entity = nil
     end
 
     -- Remove the waypoint and shift all others to the left
-    table.remove(sequence, waypoint_index)
+    table.remove(waypoints, waypoint_index)
 
-    -- All sequence elements after waypoint_index have been shifted left.
-    -- Any stored sequence indexes > waypoint_index must be realigned.
-    tas.realign_sequence_indexes(owner_index, sequence, waypoint_index, -1)
+    -- All waypoint elements after waypoint_index have been shifted left.
+    -- Any stored waypoint indexes > waypoint_index must be realigned.
+    tas.realign_waypoint_indexes(indexes.sequence_index, waypoint_index, -1)
 end
 
 function tas.on_pre_removing_entity(event)
@@ -273,7 +372,7 @@ end
 
 function tas.on_clicked_waypoint(player_index, waypoint_entity)
     local indexes = tas.find_waypoint_from_entity(waypoint_entity)
-    global.players[player_index].selected_player = indexes.player_index
+    global.players[player_index].selected_sequence_index = indexes.sequence_index
     tas.select_waypoint(player_index, indexes.waypoint_index)
 end
 
