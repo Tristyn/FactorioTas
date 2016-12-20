@@ -8,7 +8,7 @@ data:extend(
         -- subgroup = "grass",
         order = "a[tas]",
         -- collision_box = {{-1.1, -1.1}, {1.1, 1.1}},
-        collision_mask = { "water-tile" },
+        collision_mask = {  },
         selection_box = { { - 0.4, - 0.4 }, { 0.4, 0.4 } },
         -- drawing_box = { { - 0.5, - 0.5 }, { 0.5, 0.5 } },
         minable =
@@ -18,7 +18,7 @@ data:extend(
             result = "tas-waypoint",
             -- count = 20
         },
-        render_layer = "object",
+        render_layer = "higher-object-above",
         mined_sound = { filename = "__base__/sound/deconstruct-bricks.ogg" },
         max_health = 1000,
         pictures =
@@ -36,10 +36,10 @@ data:extend(
         flags = { "placeable-neutral", "placeable-off-grid", "not-on-map" },
         icon = "__FactorioTas__/graphics/entity/waypoint-selected.png",
         order = "a[tas]",
-        collision_mask = { "water-tile" },
+        collision_mask = {  },
         selectable_in_game = false,
         selection_box = { { - 0.5, - 0.5 }, { 0.5, 0.5 } },
-        render_layer = "object",
+        render_layer = "higher-object-above",
         mined_sound = { filename = "__base__/sound/deconstruct-bricks.ogg" },
         max_health = 1000,
         pictures =
