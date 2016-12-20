@@ -30,6 +30,9 @@ end
 function tas.init_globals()
     global.sequences = { }
     global.players = { }
+
+    tas.runner.init_globals()
+    tas.gui.init_globals()
 end
 
 function tas.on_player_created(event)
@@ -90,7 +93,7 @@ function tas.ensure_first_sequence_initialized(add_spawn_waypoint)
     end
 
     if add_spawn_waypoint then
-        game.print("Placing an initial waypoint at spawn..")
+        game.print("Placing the initial waypoint at spawn..")
     end
     tas.new_sequence(add_spawn_waypoint)
 end
@@ -354,5 +357,11 @@ function tas.on_left_click(event)
 
     if player.selected ~= nil and player.selected.name == "tas-waypoint" then
         tas.on_clicked_waypoint(player_index, player.selected)
+    end
+end
+
+function tas.on_tick(event)
+    if global.gui.is_playing then
+        tas.runner.step_runners()
     end
 end

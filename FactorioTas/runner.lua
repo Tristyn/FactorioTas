@@ -1,5 +1,9 @@
 tas.runner = { }
-tas.runner.runners = { }
+
+function tas.runner.init_globals()
+    global.runner = {}
+    global.runner.runners = {}
+end
 
 -- Create a new runner and character entity
 -- Returns nil if sequence is empty
@@ -16,7 +20,7 @@ function tas.runner.new_runner(sequence)
         character = start.surface.create_entity { name = "player", position = start.position },
     }
 
-    table.insert(tas.runner.runners, runner)
+    table.insert(global.runner.runners, runner)
 
     return runner
 end
@@ -27,15 +31,17 @@ function tas.runner.remove_runner(runner)
     
     -- murder it
     if runner.character.valid then
-        runner.character.destroy()
+        if runner.character.destroy() == false then
+            game.print("couldn't destroy player :( pls fix")
+        end
     end
 
-    local index = tas.scan_table_for_value(tas.runner.runners, function(entry) return entry end, runner)
+    local index = tas.scan_table_for_value(global.runner.runners, function(entry) return entry end, runner)
     if index == nil then
         return false
     end
     
-    table.remove(tas.runner.runners, index)
+    table.remove(global.runner.runners, index)
     return true
 end
 
@@ -60,7 +66,7 @@ function tas.runner.step_runner(runner)
     -- check construction
 
     -- check waypoint goal
-    runner.reached_waypoint = tas.runner.move_towards_waypoint(runner)
+    runner.reached_waypoint = tas.runner.move_towards_waypoint(character, waypoint)
 
     -- check if waypoint goals are satisfied
     if runner.reached_waypoint == true then
@@ -70,7 +76,7 @@ function tas.runner.step_runner(runner)
 end
 
 function tas.runner.step_runners()
-    for i, runner in pairs(tas.runner.runners) do
+    for i, runner in pairs(global.runner.runners) do
         tas.runner.step_runner(runner)
     end
 end

@@ -12,10 +12,11 @@ end
 
 -- Calculates the players walking speed.
 function util.get_walking_speed(character)
+    local running_speed_modifier = 1 -- + character.character_running_speed_modifier
+
+    --[[
     local armor_slots = character.get_inventory(defines.inventory.player_armor)
     -- armor_slots is an inventory of length 1
-
-    local running_speed_modifier = 1 + character.character_running_speed_modifier
 
     -- enumerate all equipment items in the characters armor
     if armor_slots ~= nil then
@@ -31,6 +32,7 @@ function util.get_walking_speed(character)
             end
         end
     end
+    --]]
 
     return running_speed_modifier * constants.base_walking_speed
 end

@@ -45,3 +45,8 @@ script.on_event("waypoint_select_hotkey", function(event)
     local _, err = xpcall(tas.on_left_click, debug.traceback, event)
     if err then msg_all( { "TAS-err-specific", "waypoint_select_hotkey", err }) end
 end )
+
+script.on_event(defines.events.on_tick, function(event)
+    local _, err = xpcall(tas.on_tick, debug.traceback, event)
+    if err then msg_all( { "TAS-err-specific", "on_tick", err }) end
+end )
