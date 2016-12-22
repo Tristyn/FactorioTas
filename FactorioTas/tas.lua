@@ -301,12 +301,18 @@ function tas.on_built_waypoint(created_entity, player_index)
     end
 end
 
+function tas.on_built_ghost(created_ghost, player_index)
+    
+end
+
 function tas.on_built_entity(event)
     local created_entity = event.created_entity
     local player_index = event.player_index
 
     if created_entity.name == "tas-waypoint" then
         tas.on_built_waypoint(created_entity, player_index)
+    elseif created_entity.name == "entity-ghost" then
+        tas.on_built_ghost(created_entity, player_index)
     end
 end
 
