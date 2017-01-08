@@ -6,10 +6,6 @@ function tas.log(level, message)
     end
 end
 
-function tas.integer_to_string(int)
-    return string.format("%.0f", int)
-end
-
 -- Creates and returns a static text entity that never despawns.
 -- If color is nil, the text will be white
 function tas.create_static_text(surface, position, content, color)
@@ -48,25 +44,42 @@ function tas.on_player_created(event)
     tas.gui.init_player(player_index)
 end
 
+-- Creates a new waypoint table. waypoint_entity can be nil.
+function tas.new_waypoint(surface, position, waypoint_index, is_visible_in_game, waypoint_entity)
+    local text_entity
+
+    if is_visible_in_game == true then
+        if waypoint_entity == nil or waypoint_entity.valid == false then
+            waypoint_entity = surface.create_entity { name = "tas-waypoint", position = position }
+        end
+
+        text_entity = tas.create_static_text(surface, position, util.integer_to_string(waypoint_index))
+    end
+
+    return
+    {
+        surface = surface,
+        position = position,
+        entity = waypoint_entity,
+        text_entity = text_entity,
+        build_orders = { }
+    }
+end
+
 -- creates a new sequence and returns it's index in the sequence table
 function tas.new_sequence(add_spawn_waypoint)
     local sequence_index = #global.sequences + 1
 
 
-    local sequence = { waypoints = { } }
+    local sequence = {
+        waypoints = { }
+    }
 
     if add_spawn_waypoint == true then
         local surface = game.surfaces["nauvis"]
         local origin = { x = 0, y = 0 }
 
-        sequence.waypoints[1] =
-        {
-            type = "waypoint",
-            position = origin,
-            surface = surface,
-            entity = surface.create_entity { name = "tas-waypoint", position = origin },
-            text_entity = tas.create_static_text(surface,origin,"1")
-        }
+        sequence.waypoints[1] = tas.new_waypoint(surface, origin, 1, true)
     end
 
     global.sequences[sequence_index] = sequence
@@ -152,12 +165,23 @@ function tas.scan_table_for_value(table, selector, value)
 end
 
 function tas.find_waypoint_from_entity(waypoint_entity)
-    -- iterate all waypoints of all players to find a match
+    -- iterate all waypoints of all sequences to find a match
     for sequence_index, sequence in ipairs(global.sequences) do
 
-        waypoint_data_index = tas.scan_table_for_value(sequence.waypoints, function(waypoint) return waypoint.entity end, waypoint_entity)
+        local waypoint_data_index = tas.scan_table_for_value(sequence.waypoints, function(waypoint) return waypoint.entity end, waypoint_entity)
         if waypoint_data_index ~= nil then
             return { sequence_index = sequence_index, waypoint_index = waypoint_data_index }
+        end
+    end
+end
+
+function tas.find_build_order_from_entity(ghost_entity)
+    for sequence_index, sequence in ipairs(global.sequences) do
+        for waypoint_index, waypoint in ipairs(sequence.waypoints) do
+            local build_order_index = tas.scan_table_for_value(waypoint.build_orders, function(build_order) return build_order.entity end, ghost_entity)
+            if build_order_index ~= nil then
+                return { sequence_index = sequence_index, waypoint_index = waypoint_index, build_order_index = build_order_index }
+            end
         end
     end
 end
@@ -203,7 +227,7 @@ function tas.move_waypoint(sequence_index, waypoint_index, new_waypoint_entity)
     if waypoint.text_entity ~= nil then
         waypoint.text_entity.destroy()
     end
-    waypoint.text_entity = tas.create_static_text(new_waypoint_entity.surface, new_waypoint_entity.position, tas.integer_to_string(waypoint_index))
+    waypoint.text_entity = tas.create_static_text(new_waypoint_entity.surface, new_waypoint_entity.position, util.integer_to_string(waypoint_index))
     waypoint.position = new_waypoint_entity.position
 
     -- update waypoint highlights
@@ -245,7 +269,7 @@ function tas.realign_waypoint_indexes(sequence_index, start_index, shift)
         local waypoint = waypoints[i]
         if waypoint.text_entity ~= nil then
             waypoint.text_entity.destroy()
-            waypoint.text_entity = tas.create_static_text(waypoint.surface, waypoint.position, tas.integer_to_string(i))
+            waypoint.text_entity = tas.create_static_text(waypoint.surface, waypoint.position, util.integer_to_string(i))
         end
     end
 
@@ -273,10 +297,9 @@ function tas.insert_waypoint(waypoint_entity, player_index)
     end
     --]]
 
-    local waypoint_text_entity = tas.create_static_text(waypoint_entity.surface, waypoint_entity.position, tas.integer_to_string(waypoint_insert_index))
+    local waypoint = tas.new_waypoint(waypoint_entity.surface, waypoint_entity.position, waypoint_insert_index, true, waypoint_entity)
 
-    local waypoint_data = { type = "waypoint", position = waypoint_entity.position, surface = waypoint_entity.surface, entity = waypoint_entity, text_entity = waypoint_text_entity }
-    table.insert(sequence.waypoints, waypoint_insert_index, waypoint_data)
+    table.insert(sequence.waypoints, waypoint_insert_index, waypoint)
 
     tas.realign_waypoint_indexes(sequence_index, waypoint_insert_index, 1)
 
@@ -301,8 +324,39 @@ function tas.on_built_waypoint(created_entity, player_index)
     end
 end
 
+-- Creates a new build order table. ghost_entity can be nil.
+function tas.new_build_order_from_ghost_entity(ghost_entity, item_to_place_prototype)
+    return
+    {
+        surface = ghost_entity.surface,
+        position = ghost_entity.position,
+        item_name = item_to_place_prototype.name,
+        direction = ghost_entity.direction,
+        entity = ghost_entity,
+        entity_name = ghost_entity.ghost_name
+    }
+end
+
 function tas.on_built_ghost(created_ghost, player_index)
-    
+    local player = global.players[player_index]
+    local waypoint_index = player.selected_sequence_waypoint_index
+    local cursor_stack = game.players[player_index].cursor_stack
+
+    if cursor_stack.valid_for_read == false or cursor_stack.name == nil then
+        error("Could not create a build order because the item used to place it (LuaPlayer.item_stack) is nil or empty.")
+    elseif cursor_stack.prototype.place_result ~= created_ghost.ghost_prototype then
+        error("Could not create a build order because the ghost and the item held in the players hand do not match.")
+    end
+
+    if waypoint_index == nil then return end
+
+    local sequence_index = player.selected_sequence_index
+    local sequence = global.sequences[sequence_index]
+    local waypoint = sequence.waypoints[waypoint_index]
+
+    local build_order = tas.new_build_order_from_ghost_entity(created_ghost, cursor_stack.prototype)
+
+    table.insert(waypoint.build_orders, build_order)
 end
 
 function tas.on_built_entity(event)
@@ -343,11 +397,21 @@ function tas.on_pre_removing_waypoint(waypoint_entity)
     tas.realign_waypoint_indexes(indexes.sequence_index, waypoint_index, -1)
 end
 
+function tas.on_pre_removing_ghost(ghost_entity)
+    local indexes = tas.find_build_order_from_entity(ghost_entity)
+
+    if indexes == nil then return end
+
+    table.remove(global.sequences[indexes.sequence_index].waypoints[indexes.waypoint_index].build_orders, indexes.build_order_index)
+end
+
 function tas.on_pre_removing_entity(event)
     local entity = event.entity
 
     if entity.name == "tas-waypoint" then
         tas.on_pre_removing_waypoint(entity)
+    elseif entity.name == "entity-ghost" then
+        tas.on_pre_removing_ghost(entity)
     end
 end
 
@@ -357,17 +421,28 @@ function tas.on_clicked_waypoint(player_index, waypoint_entity)
     tas.select_waypoint(player_index, indexes.waypoint_index)
 end
 
+function tas.on_clicked_ghost(player_index, ghost_entity)
+    local build_order_indexes = tas.find_build_order_from_entity(ghost_entity)
+
+    if build_order_indexes == nil then return end
+
+    tas.select_waypoint(player_index, build_order_indexes.waypoint_index, build_order_indexes.sequence_index)
+end
+
 function tas.on_left_click(event)
     local player_index = event.player_index
     local player = game.players[player_index]
 
-    if player.selected ~= nil and player.selected.name == "tas-waypoint" then
+    if player.selected == nil then return end
+    local entity_name = player.selected.name
+
+    if entity_name == "tas-waypoint" then
         tas.on_clicked_waypoint(player_index, player.selected)
+    elseif entity_name == "entity-ghost" then
+        tas.on_clicked_ghost(player_index, player.selected)
     end
 end
 
 function tas.on_tick(event)
-    if global.gui.is_playing then
-        tas.runner.step_runners()
-    end
+    tas.runner.on_tick()
 end

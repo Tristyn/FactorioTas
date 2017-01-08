@@ -26,8 +26,11 @@ function tas.gui.show_editor(player_index)
 
     gui.editor = player.gui.left.add { type = "frame", direction = "vertical", name = "tas_editor", caption = "TAS Editor" }
 
-    gui.play = gui.editor.add { type = "button", caption = "play" }
-    gui.clear = gui.editor.add { type = "button", caption = "clear" }
+    local playback = gui.editor.add { type = "flow", direction = "horizontal" }
+    gui.playback = { }
+    gui.playback.play = playback.add { type = "button", caption = "play" }
+    gui.playback.pause = playback.add { type = "button", caption = "pause" }
+    gui.playback.step = playback.add { type = "button", caption = "step" }
 
     gui.editor.add { type = "label", caption = "Waypoint Mode:" }
     local waypoints = gui.editor.add { type = "flow", direction = "horizontal" }
@@ -82,13 +85,11 @@ function tas.gui.on_click(event)
             gui.current_state = "move"
             waypoints.move.caption = "move"
         end
-    elseif element == gui.play then
-        tas.runner.new_runner(global.sequences[1])
-        global.gui.is_playing = true
-    elseif element == gui.clear then
-        global.gui.is_playing = false
-        for i = #global.runner.runners, 1, -1 do
-            tas.runner.remove_runner(global.runner.runners[i])
-        end
+    elseif element == gui.playback.play then
+        tas.runner.play(player_index)
+    elseif element == gui.playback.pause then
+        tas.runner.pause()
+    elseif element == gui.playback.step then
+        tas.runner.step(player_index)
     end
 end
