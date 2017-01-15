@@ -28,9 +28,11 @@ function tas.gui.show_editor(player_index)
 
     local playback = gui.editor.add { type = "flow", direction = "horizontal" }
     gui.playback = { }
-    gui.playback.play = playback.add { type = "button", caption = "play" }
-    gui.playback.pause = playback.add { type = "button", caption = "pause" }
-    gui.playback.step = playback.add { type = "button", caption = "step" }
+    gui.playback.play = playback.add { type = "button", caption = "play", style = "playback-button" }
+    gui.playback.pause = playback.add { type = "button", caption = "pause", style = "playback-button" }
+    gui.playback.step = playback.add { type = "button", caption = "step:", style = "playback-button" }
+    gui.playback.step_ticks = playback.add { type = "textfield", caption = "# ticks", style = "playback-textfield" }
+    gui.playback.step_ticks.text = "30"
 
     gui.editor.add { type = "label", caption = "Waypoint Mode:" }
     local waypoints = gui.editor.add { type = "flow", direction = "horizontal" }
@@ -86,10 +88,13 @@ function tas.gui.on_click(event)
             waypoints.move.caption = "move"
         end
     elseif element == gui.playback.play then
-        tas.runner.play(player_index)
+        tas.runner.play(player_index, nil)
     elseif element == gui.playback.pause then
         tas.runner.pause()
     elseif element == gui.playback.step then
-        tas.runner.step(player_index)
+        local num_ticks = tonumber(gui.playback.step_ticks.text)
+        if num_ticks ~= nil then
+            tas.runner.play(player_index, num_ticks)
+        end
     end
 end

@@ -1,14 +1,62 @@
 constants = {
+    -- Some of these constants can be read/written during data initialization phase.
+    -- There is no way to know their value during game execution phase so they are stored here.
+
     base_walking_speed = 0.14844,
+    base_build_distance = 6,
+    -- from data.raw.player.player.build_distance
     character_inventories = { defines.inventory.player_main, defines.inventory.player_quickbar },
     indev_screen_resolution = { x = 1362, y = 701 }
 }
 
 util = { }
+math.point = { }
+math.rectangle = { }
+
+-- Restricts a number to be within a specified range.
+function math.clamp(value, min, max)
+    return math.max(math.min(value, max), min)
+end
 
 -- Calculate Euclidean distance in 2d.
 function math.pyth(point_a, point_b)
-    return Math.Sqrt(Math.Pow(point_b.x - point_a.x, 2) + Math.Pow(point_b.y - point_a.y, 2))
+    local distance_x = point_a.x - point_b.x
+    local distance_y = point_a.y - point_b.y
+
+    return math.sqrt(distance_x * distance_x + distance_y * distance_y)
+end
+
+-- Computes the distance between a point and a rectangle.
+-- If the point is inside the rectangle, the distance returned is 0.
+-- Argument point is defines as { x = 3, y = 8 }
+-- Argument rectangle is defined as {left_top = { x = -2, y = -3}, right_bottom = {x = 5, y = 8}}. See http://lua-api.factorio.com/latest/Concepts.html#BoundingBox
+function math.distance_rectangle_to_point(rectangle, point)
+    -- Get a position within the bounds of rectangle that is the nearest to point
+    -- When point is inside of rectangle, then rect_position will equal point
+    local rect_position =
+    {
+        x = math.clamp(point.x,rectangle.left_top.x,rectangle.right_bottom.x),
+        y = math.clamp(point.y,rectangle.left_top.y,rectangle.right_bottom.y)
+    }
+
+    return math.pyth(point, rect_position)
+end
+
+-- Adds two points together
+function math.point.add(point_a, point_b)
+    return
+    {
+        x = point_a.x + point_b.x,
+        y = point_a.y + point_b.y
+    }
+end
+
+function math.rectangle.translate(rectangle, point_offset)
+    return
+    {
+        left_top = math.point.add(rectangle.left_top, point_offset),
+        right_bottom = math.point.add(rectangle.right_bottom, point_offset)
+    }
 end
 
 -- Calculates the players walking speed.
@@ -38,6 +86,10 @@ function util.get_walking_speed(character)
     --]]
 
     return running_speed_modifier * constants.base_walking_speed
+end
+
+function util.get_build_distance(character)
+    return constants.base_build_distance + character.character_build_distance_bonus
 end
 
 -- south/down = +y
@@ -152,7 +204,7 @@ function util.insert_into_inventories(entity, inventories, items)
             inserted_tally = inserted_tally + num_inserted
             items_clone.count = items_clone.count - num_inserted
 
-            if items_clone.count == 0  then
+            if items_clone.count == 0 then
                 break
             end
         end

@@ -1,8 +1,26 @@
-tas.runner = { }
+tas.runner =
+{
+    playback_state =
+    {
+        paused = { },
+        playing = { },
+        tick_1_prepare_to_attach_runner = { },
+        tick_2_attach_runner = { },
+        tick_3_running = { },
+        tick_4_prepare_to_attach_player = { },
+        tick_5_attach_player = { }
+    },
+
+    playback_mode =
+    {
+        playing = { },
+        stepping = { }
+    }
+}
 
 function tas.runner.init_globals()
     global.runner_state = { }
-    global.runner_state.is_playing = false
+    global.runner_state.playback_state = tas.runner.playback_state.paused
 end
 
 -- Create a new runner and character entity
@@ -104,19 +122,21 @@ function tas.runner.move_items(target_stack, source_stack, character, overflow_i
 end
 
 function tas.runner.can_reach_build_order(character, build_order)
-    local hittest_entity = nil
-    if build_order.entity ~= nil then
-        hittest_entity = build_order.entity
-    else
+    local hittest_entity = build_order.entity
+
+    if hittest_entity == nil then
         -- Create an ephemeral entity to run a hit-test against.
         -- Ghost entities flashing into and out of existance may mess with construction robots, not sure.
         hittest_entity = build_order.surface.create_entity( { name = build_order.entity_name, position = build_order.position, direction = build_order.direction })
     end
-    if hittest_entity == nil then
-        return false
-    end
 
-    local can_reach = character.can_reach_entity(hittest_entity)
+    -- The function character.can_reach_entity() is off limits because
+    -- it will always return true for entities such as ghost.
+
+    local selection_box_world_space = math.rectangle.translate(hittest_entity.prototype.selection_box, hittest_entity.position)
+    local distance = math.distance_rectangle_to_point(selection_box_world_space, character.position)
+    local can_reach = distance < util.get_build_distance(character) -0.5
+    -- Include a 0.5 margin of error because this isn't the exact reach distance formula.
 
     if build_order.entity == nil then
         -- destroy the ephemeral entity that was created earlier in the function
@@ -131,7 +151,11 @@ function tas.runner.try_build_object(player, build_order)
     -- in the future, calculate the players zoom
     player.zoom = 1
     player.cursor_position = util.surface_to_screen_position(build_order.position, player.position, 1, constants.indev_screen_resolution)
-    msg_all("placing obj")
+    local cursor = "empty";
+    if player.cursor_stack.valid_for_read then
+        cursor = player.cursor_stack.name
+    end
+    msg_all("placing " .. build_order.item_name .. ", cursor: " .. cursor)
 
     return player.build_from_cursor(click_position)
 end
@@ -188,7 +212,7 @@ function tas.runner.step_build_state(runner, player)
         if item_to_place.valid_for_read == false or item_to_place.name ~= runner.in_progress_build_order.item_name then
             item_to_place = util.find_item_stack(character, constants.character_inventories, runner.in_progress_build_order.item_name)
         end
-         if item_to_place == nil then
+        if item_to_place == nil then
             msg_all( { "TAS-err-generic", "Could not place " .. runner.in_progress_build_order.item_name .. " because it wasn't in the inventory." })
             tas.runner.tear_down_build_state(runner, true)
             return
@@ -265,59 +289,54 @@ end
 function tas.runner.on_tick()
     if tas.runner.runner_exists() == false then return end
 
-    if global.runner_state.skip_next_tick == true then
-        global.runner_state.skip_next_tick = false
-        return
-    end
-
+    local runner = global.runner
     local player = game.players[global.runner_state.playback_player_index]
-    local player_original_character = global.runner_state.playback_player_original_character
 
-    local attached_player_this_tick = false
+    if global.runner_state.playback_state == tas.runner.playback_state.tick_1_prepare_to_attach_runner then
 
-    if global.runner_state.attach_playback_player_next_tick == true then
-
-        local character_to_attach = nil
-        if global.runner_state.is_playing == true then
-            character_to_attach = global.runner.character
-        else
-            character_to_attach = player_original_character
-        end
         tas.runner.prepare_to_attach_player(player)
-        tas.runner.attach_player(player, character_to_attach)
 
-        global.runner_state.attach_playback_player_next_tick = false
-        attached_player_this_tick = true
-    end
+        global.runner_state.playback_state = tas.runner.playback_state.tick_2_attach_runner
 
-    if global.runner_state.is_playing == true then
+    elseif global.runner_state.playback_state == tas.runner.playback_state.tick_2_attach_runner then
 
-        if player.connected == false then
-            msg_all(player.name .. " disconnected, pausing playback.")
-            tas.runner.pause()
-            return
-        end
-        local runner = global.runner
+        tas.runner.attach_player(player, global.runner.character)
 
-        if global.runner_state.is_pausing_after_next_runner_step == false then
-            tas.runner.step_runner(runner, player)
-        else
-            if attached_player_this_tick == true then
-                tas.runner.step_runner(runner, player)
-            else
-                tas.runner.prepare_to_attach_player(player)
-                global.runner_state.is_playing = false
-                global.runner_state.attach_playback_player_next_tick = true
+        global.runner_state.playback_state = tas.runner.playback_state.tick_3_running
 
-                global.runner_state.is_pausing_after_next_runner_step = false
+    elseif global.runner_state.playback_state == tas.runner.playback_state.tick_3_running then
+
+        tas.runner.step_runner(runner, player)
+
+        -- decrement num_ticks_to_step and check if we should start to pause
+        if global.runner_state.num_ticks_to_step ~= nil then
+            global.runner_state.num_ticks_to_step = global.runner_state.num_ticks_to_step - 1
+
+            if global.runner_state.num_ticks_to_step == 0 then
+                global.runner_state.playback_state = tas.runner.playback_state.tick_4_prepare_to_attach_player
             end
         end
+
+    elseif global.runner_state.playback_state == tas.runner.playback_state.tick_4_prepare_to_attach_player then
+
+        tas.runner.prepare_to_attach_player(player)
+
+        global.runner_state.playback_state = tas.runner.playback_state.tick_5_attach_player
+
+    elseif global.runner_state.playback_state == tas.runner.playback_state.tick_5_attach_player then
+
+        local player_original_character = global.runner_state.playback_player_original_character
+        tas.runner.attach_player(player, player_original_character)
+
+        global.runner_state.playback_state = tas.runner.playback_state.paused
+
     end
+
 end
 
 function tas.runner.prepare_to_attach_player(player_entity)
 
-    -- Make character stand
+    -- Make character stand still
     if player_entity.character ~= nil then
         player_entity.character.walking_state = { walking = false }
     end
@@ -346,44 +365,22 @@ function tas.runner.attach_player(player_entity, character)
     end
 end
 
-function tas.runner.play(player_index)
-    if global.runner_state.is_playing == true then
+-- setting num_ticks_to_step to nil denotes that it will step indefinitely
+function tas.runner.play(player_index, num_ticks_to_step)
+    if global.runner_state.playback_state == tas.runner.playback_state.tick_1_prepare_to_attach_runner or
+        global.runner_state.playback_state == tas.runner.playback_state.tick_2_attach_runner or
+        global.runner_state.playback_state == tas.runner.playback_state.tick_3_running then
+        if num_ticks_to_step == nil then
+            -- begin running forever
+            global.runner_state.num_ticks_to_step = nil
+        elseif global.runner_state.num_ticks_to_step == nil then
+            global.runner_state.num_ticks_to_step = num_ticks_to_step
+        else
+            global.runner_state.num_ticks_to_step = global.runner_state.num_ticks_to_step + num_ticks_to_step
+        end
+
         return
-    end
-
-    tas.runner.ensure_runner_initialized()
-
-    local player_entity = game.players[player_index]
-
-    -- attach player
-    tas.runner.prepare_to_attach_player(player_entity)
-    -- tas.runner.attach_player(player_entity, global.runner.character)
-
-    global.runner_state.is_playing = true
-    global.runner_state.skip_next_tick = true
-    global.runner_state.attach_playback_player_next_tick = true
-
-    global.runner_state.playback_player_index = player_index
-    global.runner_state.playback_player_original_character = player_entity.character
-end
-
-function tas.runner.pause()
-    if global.runner_state.is_playing == false then
-        return
-    end
-
-    local runner = global.runner
-    local player_entity = game.players[global.runner_state.playback_player_index]
-
-    -- return the player to their original character (or god mode if they never had one)
-    tas.runner.prepare_to_attach_player(player_entity)
-
-    global.runner_state.is_playing = false
-    global.runner_state.attach_playback_player_next_tick = true
-end
-
-function tas.runner.step(player_index)
-    if global.runner_state.is_playing == true then
+    elseif global.runner_state.playback_state ~= tas.runner.playback_state.paused then
         return
     end
 
@@ -392,21 +389,17 @@ function tas.runner.step(player_index)
 
     tas.runner.ensure_runner_initialized()
 
-    -- attach player
-    tas.runner.prepare_to_attach_player(player_entity)
-    -- tas.runner.attach_player(player_entity, global.runner.character)
-
-    -- tas.runner.step_runner(global.runner, player_entity)
-
-    global.runner_state.is_playing = true
-    global.runner_state.skip_next_tick = true
-    global.runner_state.attach_playback_player_next_tick = true
-    global.runner_state.is_pausing_after_next_runner_step = true
+    global.runner_state.playback_state = tas.runner.playback_state.tick_1_prepare_to_attach_runner
+    global.runner_state.num_ticks_to_step = num_ticks_to_step
 
     global.runner_state.playback_player_index = player_index
     global.runner_state.playback_player_original_character = original_character
+end
 
-    -- return them to their body
-    -- tas.runner.prepare_to_attach_player(player_entity)
-    -- tas.runner.attach_player(player_entity, original_character)
+function tas.runner.pause()
+    if global.runner_state.playback_state ~= tas.runner.playback_state.tick_3_running then
+        return
+    end
+
+    global.runner_state.playback_state = tas.runner.playback_state.tick_4_prepare_to_attach_player
 end

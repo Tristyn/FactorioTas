@@ -22,6 +22,10 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Content Include="FactorioTas\graphics\beam\arrow-body.png" />
+    <Content Include="FactorioTas\graphics\beam\arrow-head.png" />
+    <Content Include="FactorioTas\graphics\beam\arrow-tail.png" />
+    <Content Include="FactorioTas\graphics\beam\arrow.xcf" />
     <Content Include="FactorioTas\graphics\entity\arrow.png" />
     <Content Include="FactorioTas\graphics\entity\arrow.xcf" />
     <Content Include="FactorioTas\graphics\entity\build.png" />
@@ -40,10 +44,12 @@
     <Compile Include="FactorioTas\data.lua" />
     <Compile Include="FactorioTas\gui.lua" />
     <Compile Include="FactorioTas\JSON.lua" />
+    <Compile Include="FactorioTas\prototypes\beam.lua" />
     <Compile Include="FactorioTas\prototypes\entity.lua" />
     <Compile Include="FactorioTas\prototypes\hotkey.lua" />
     <Compile Include="FactorioTas\prototypes\recipe.lua" />
     <Compile Include="FactorioTas\prototypes\item.lua" />
+    <Compile Include="FactorioTas\prototypes\style.lua" />
     <Compile Include="FactorioTas\runner.lua" />
     <Compile Include="FactorioTas\tas.lua" />
     <Compile Include="FactorioTas\util.lua" />
@@ -52,6 +58,7 @@
     <Folder Include="FactorioTas\" />
     <Folder Include="FactorioTas\graphics\" />
     <Folder Include="FactorioTas\graphics\entity\" />
+    <Folder Include="FactorioTas\graphics\beam\" />
     <Folder Include="FactorioTas\locale\" />
     <Folder Include="FactorioTas\locale\en\" />
     <Folder Include="FactorioTas\prototypes\" />

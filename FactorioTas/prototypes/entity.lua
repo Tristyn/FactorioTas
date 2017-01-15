@@ -8,7 +8,7 @@ data:extend(
         -- subgroup = "grass",
         order = "a[tas]",
         -- collision_box = {{-1.1, -1.1}, {1.1, 1.1}},
-        collision_mask = {  },
+        collision_mask = { },
         selection_box = { { - 0.4, - 0.4 }, { 0.4, 0.4 } },
         -- drawing_box = { { - 0.5, - 0.5 }, { 0.5, 0.5 } },
         minable =
@@ -36,7 +36,7 @@ data:extend(
         flags = { "placeable-neutral", "placeable-off-grid", "not-on-map" },
         icon = "__FactorioTas__/graphics/entity/waypoint-selected.png",
         order = "a[tas]",
-        collision_mask = {  },
+        collision_mask = { },
         selectable_in_game = false,
         selection_box = { { - 0.5, - 0.5 }, { 0.5, 0.5 } },
         render_layer = "higher-object-above",
@@ -48,6 +48,27 @@ data:extend(
                 filename = "__FactorioTas__/graphics/entity/waypoint-selected.png",
                 width = 32,
                 height = 32
+            }
+        }
+    },
+    {
+        type = "simple-entity",
+        name = "tas-arrow-proxy",
+        flags = { "placeable-neutral", "placeable-off-grid", "not-on-map" },
+        icon = "__FactorioTas__/graphics/entity/waypoint.png",
+        order = "a[tas]",
+        collision_mask = { },
+        selectable_in_game = false,
+        --selection_box = { { - 0.5, - 0.5 }, { 0.5, 0.5 } },
+        render_layer = "higher-object-above",
+        mined_sound = { filename = "__base__/sound/deconstruct-bricks.ogg" },
+        max_health = 1000,
+        pictures =
+        {
+            {
+                filename = "__core__/graphics/empty.png",
+                width = 1,
+                height = 1
             }
         }
     }

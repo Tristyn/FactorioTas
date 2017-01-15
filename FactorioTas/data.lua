@@ -1,4 +1,6 @@
 require ("prototypes.entity")
 require ("prototypes.item")
 require ("prototypes.recipe")
+require ("prototypes.beam")
 require ("prototypes.hotkey")
+require ("prototypes.style")
