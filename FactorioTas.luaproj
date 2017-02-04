@@ -43,12 +43,14 @@
     <Compile Include="FactorioTas\control.lua" />
     <Compile Include="FactorioTas\data.lua" />
     <Compile Include="FactorioTas\gui.lua" />
+    <Compile Include="FactorioTas\inspect.lua" />
     <Compile Include="FactorioTas\JSON.lua" />
     <Compile Include="FactorioTas\prototypes\beam.lua" />
     <Compile Include="FactorioTas\prototypes\entity.lua" />
     <Compile Include="FactorioTas\prototypes\hotkey.lua" />
     <Compile Include="FactorioTas\prototypes\recipe.lua" />
     <Compile Include="FactorioTas\prototypes\item.lua" />
+    <Compile Include="FactorioTas\prototypes\sprite.lua" />
     <Compile Include="FactorioTas\prototypes\style.lua" />
     <Compile Include="FactorioTas\runner.lua" />
     <Compile Include="FactorioTas\tas.lua" />

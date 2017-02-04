@@ -12,3 +12,11 @@ data.raw["gui-style"].default["playback-textfield"] = {
     bottom_padding = 3,
     maximal_width = 60
 }
+
+data.raw["gui-style"].default["horizontal-rule"] = {
+	type = "textfield_style",
+	parent = "textfield_style",
+	top_padding = 3,
+    bottom_padding = 3,
+    maximal_width = 60
+}

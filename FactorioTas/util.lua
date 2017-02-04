@@ -6,12 +6,17 @@ constants = {
     base_build_distance = 6,
     -- from data.raw.player.player.build_distance
     character_inventories = { defines.inventory.player_main, defines.inventory.player_quickbar },
-    indev_screen_resolution = { x = 1362, y = 701 }
+    indev_screen_resolution = { x = 1362, y = 701 },
+    debug = true
 }
 
 util = { }
 math.point = { }
 math.rectangle = { }
+
+function util.init_globals()
+    global.guid_count = 0
+end
 
 -- Restricts a number to be within a specified range.
 function math.clamp(value, min, max)
@@ -54,9 +59,17 @@ end
 function math.rectangle.translate(rectangle, point_offset)
     return
     {
-        left_top = math.point.add(rectangle.left_top, point_offset),
-        right_bottom = math.point.add(rectangle.right_bottom, point_offset)
+        left_top = math.point.add(rectangle.left_top,point_offset),
+        right_bottom = math.point.add(rectangle.right_bottom,point_offset)
     }
+end
+
+function util.get_guid()
+    global.guid_count = global.guid_count + 1
+    if global.guid_count < 0 then
+        msg_all( { "TAS-err-generic", "Globally unique ID overflow. Replace GUID with a big int implementation!" })
+    end
+    return global.guid_count
 end
 
 -- Calculates the players walking speed.
@@ -211,4 +224,84 @@ function util.insert_into_inventories(entity, inventories, items)
     end
 
     return inserted_tally
+end
+
+-- Performs a breadth first iteration over all key-values in a table
+-- Key-values may be returned multiple times. Cyclical graphs are OK.
+-- parameter types_whitelist is a string or table of strings which denotes the list of types
+--  (as strings) that will be returned in the traversal. nil will return all fields.
+function util.pairs_recursive(table_, types_whitelist)
+    -- define table_ do not give a different meaning to table.insert()
+
+    local function iterator(table_stack, seen)
+
+        if #table_stack == 0 then
+            -- iteration complete
+            return nil, nil, false
+        end
+
+        local top = table_stack[#table_stack]
+        local tab = top.table
+        local index = top.index
+        local value
+
+        index, value = next(tab, index)
+        top.index = index
+
+        if index == nil then
+            -- at the start of traversal, nil index denotes the table is empty
+            -- during traversal, nil index denotes the iteration has completed
+
+            table.remove(table_stack)
+
+            return nil, nil, true
+        end
+
+        local value_type = type(value)
+
+        if value_type == "table" and type(value.__self) ~= "userdata" and seen[value] == nil then
+
+            seen[value] = value
+            table.insert(table_stack, { table = value, index = nil })
+
+        end
+
+        if types_hashset == nil or types_hashset[value_type] ~= nil then
+            return index, value, true
+        else
+            return index, nil, true
+        end
+
+    end
+
+    types_hashset = { }
+    if types_whitelist ~= nil then
+        if type(types_whitelist) == "string" then
+            types_whitelist = { types_whitelist }
+        end
+        for _, val in pairs(types_whitelist) do
+            types_hashset[val] = val
+        end
+    end
+
+    local stack = { { table = table_, index = nil } }
+
+    -- stores nodes (tables) that have previously been traversed. Required for cyclic graphs
+    local seen = { table_ = table_ }
+    local value = nil
+    local continue = true
+
+    return function()
+
+        local index
+
+        while continue == true do
+            index, value, continue = iterator(stack, seen)
+
+            if value ~= nil then
+                return index, value
+            end
+
+        end
+    end
 end

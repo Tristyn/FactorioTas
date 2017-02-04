@@ -32,14 +32,24 @@ function tas.runner.new_runner(sequence)
         return nil
     end
 
+    local character = start.surface.create_entity { name = "player", position = start.position, force = "player" }
+
+    -- insert items that are given at spawn
+    local quickbar = character.get_inventory(defines.inventory.player_quickbar)
+    quickbar.insert( { name = "burner-mining-drill", count = 1 })
+    quickbar.insert( { name = "stone-furnace", count = 1 })
+
     global.runner = {
         sequence = sequence,
         waypoint_index = 1,
         active_build_orders = { },
-        build_state = { },
-        character = start.surface.create_entity { name = "player", position = start.position, force = "player" },
+        active_mine_orders = { },
+        mining_finished_this_tick = false,
+        character = character,
     }
+
     tas.runner.activate_build_orders_in_waypoint(global.runner, 1)
+    tas.runner.activate_mine_orders_in_waypoint(global.runner, 1)
 end
 
 -- Removes (and murders) the runner.
@@ -80,6 +90,73 @@ end
 function tas.runner.move_towards_waypoint(character, waypoint)
     local direction_to_waypoint = tas.runner.get_direction_to_waypoint(character, waypoint)
     character.walking_state = { walking = direction_to_waypoint ~= nil, direction = direction_to_waypoint }
+end
+
+function tas.runner.move_player_cursor(player, world_position)
+    player.zoom = 1
+    player.cursor_position = util.surface_to_screen_position(world_position, player.position, 1, constants.indev_screen_resolution)
+    -- Note: update_selected_entity is needed for mining, but does not effect the placement of buildings via Player::build_from_cursor()
+    player.update_selected_entity(world_position)
+end
+
+function tas.runner.activate_mine_orders_in_waypoint(runner, waypoint_index)
+    for _, mine_order in ipairs(runner.sequence.waypoints[waypoint_index].mine_orders) do
+        table.insert(runner.active_mine_orders, mine_order)
+    end
+end
+
+function tas.runner.can_reach_mine_order(character, mine_order)
+    return character.can_reach_entity(mine_order.entity)
+end
+
+function tas.runner.tear_down_mine_state(runner, remove_mine_order)
+    if remove_mine_order == true then
+        table.remove(runner.active_mine_orders, runner.in_progress_mine_order_index)
+    end
+
+    runner.in_progress_mine_order = nil
+    runner.in_progress_mine_order_index = nil
+    runner.mining_completed_count = nil
+end
+
+-- returns true if mining is in progress (and players mouse is in use)
+function tas.runner.step_mining_state(runner, player)
+    local character = runner.character
+
+    if runner.in_progress_mine_order == nil then
+        -- find the next build order
+        for mine_order_index, mine_order in ipairs(runner.active_mine_orders) do
+            if tas.runner.can_reach_mine_order(character, mine_order) then
+                runner.in_progress_mine_order = mine_order
+                runner.in_progress_mine_order_index = mine_order_index
+                runner.mining_completed_count = 0
+                break
+            end
+        end
+    end
+
+    local mine_order = runner.in_progress_mine_order
+    if mine_order == nil then
+        return false
+    end
+    
+
+    if runner.mining_finished_this_tick == true then
+        runner.mining_finished_this_tick = false
+        runner.mining_completed_count = runner.mining_completed_count + 1
+    end
+
+    if runner.mining_completed_count < mine_order.count then
+        -- mining_state makes the character mine under the cursor, but doesn't MOVE that cursor.
+        -- use a different api call to move the cursor
+        character.mining_state = { mining = true, position = { 0, 0 } }
+        tas.runner.move_player_cursor(player, mine_order.position)
+        return true
+    else
+        character.mining_state = { mining = false }
+        tas.runner.tear_down_mine_state(runner, true)
+        return true
+    end
 end
 
 function tas.runner.activate_build_orders_in_waypoint(runner, waypoint_index)
@@ -149,8 +226,7 @@ end
 function tas.runner.try_build_object(player, build_order)
     -- build_order.surface.create_entity( { name = build_order.entity_name, position = build_order.position, direction = build_order.direction })
     -- in the future, calculate the players zoom
-    player.zoom = 1
-    player.cursor_position = util.surface_to_screen_position(build_order.position, player.position, 1, constants.indev_screen_resolution)
+    tas.runner.move_player_cursor(player, build_order.position)
     local cursor = "empty";
     if player.cursor_stack.valid_for_read then
         cursor = player.cursor_stack.name
@@ -263,12 +339,16 @@ function tas.runner.are_waypoint_goals_satisfied(runner, player)
     return true
 end
 
-function tas.runner.step_runner(runner, attachable_player)
+function tas.runner.step_runner(runner, attached_player)
     local waypoint = runner.sequence.waypoints[runner.waypoint_index]
     local character = runner.character
 
-    -- check construction
-    tas.runner.step_build_state(runner, attachable_player)
+    local mouse_in_use = tas.runner.step_mining_state(runner, attached_player)
+
+    if mouse_in_use == false then
+        -- check construction
+        tas.runner.step_build_state(runner, attached_player)
+    end
 
     -- walk towards waypoint
     tas.runner.move_towards_waypoint(character, runner.sequence.waypoints[runner.waypoint_index])
@@ -283,6 +363,7 @@ function tas.runner.step_runner(runner, attachable_player)
         runner.waypoint_index = runner.waypoint_index + 1
         tas.runner.move_towards_waypoint(character, runner.sequence.waypoints[runner.waypoint_index])
         tas.runner.activate_build_orders_in_waypoint(runner, runner.waypoint_index)
+        tas.runner.activate_mine_orders_in_waypoint(runner, runner.waypoint_index)
     end
 end
 
@@ -402,4 +483,18 @@ function tas.runner.pause()
     end
 
     global.runner_state.playback_state = tas.runner.playback_state.tick_4_prepare_to_attach_player
+end
+
+function tas.runner.on_pre_mined_entity(player_index, entity)
+    -- The only way to determine when a runner completes a mine order is when the mined event is fired
+    -- determine if the runner mined an item
+
+    if tas.runner.runner_exists() == false then return end
+
+    local player_character = game.players[player_index].character
+    local runner_character = global.runner.character
+
+    if runner_character == player_character then
+        global.runner.mining_finished_this_tick = true
+    end
 end
