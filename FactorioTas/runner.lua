@@ -375,6 +375,7 @@ end
 
 function tas.runner.on_tick()
     if tas.runner.runner_exists() == false then return end
+    if tas.runner.is_playing() == false then return end
 
     local runner = global.runner
     local player = game.players[global.runner_state.playback_player_index]

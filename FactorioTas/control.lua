@@ -10,9 +10,6 @@ function msg_all(message)
 	for _, p in pairs(game.players) do
 		if p.connected == true then
 			p.print(message)
-			if game ~= nil then
-				game.write_file("tas-message-log.txt", message, true, p.index)
-			end
 		end
 	end
 end

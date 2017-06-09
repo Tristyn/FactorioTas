@@ -382,12 +382,22 @@ function tas.select_waypoint(player_index, selected_sequence_waypoint_index, sel
     player.selected_waypoint_highlight_entity = nil
     player.selected_sequence_waypoint_index = selected_sequence_waypoint_index
 
-    if selected_sequence_waypoint_index == nil then return end
+    if selected_sequence_waypoint_index == nil then
 
-    -- Create the 'highlight' entity
-    local waypoint = global.sequences[player.selected_sequence_index].waypoints[selected_sequence_waypoint_index]
-    local new_highlight = waypoint.surface.create_entity { name = "tas-waypoint-selected", position = waypoint.position }
-    player.selected_waypoint_highlight_entity = new_highlight
+        tas.gui.hide_waypoint_info(player_index)
+        return
+
+    else
+
+        -- Create the 'highlight' entity
+        local waypoint = global.sequences[player.selected_sequence_index].waypoints[player.selected_sequence_waypoint_index]
+        local new_highlight = waypoint.surface.create_entity { name = "tas-waypoint-selected", position = waypoint.position }
+        player.selected_waypoint_highlight_entity = new_highlight
+
+        -- Show the waypoint gui (or hide it if no waypoint is selected)
+        tas.gui.show_waypoint_info(player_index, player.selected_sequence_index, player.selected_sequence_waypoint_index)
+
+    end
 end
 
 function tas.move_waypoint(sequence_index, waypoint_index, new_waypoint_entity)
@@ -605,6 +615,8 @@ function tas.on_pre_mined_resource(player_index, resource_entity)
     resource_entity.amount = resource_entity.amount + 1
 
     tas.add_mine_order(player_index, resource_entity)
+
+    tas.gui.refresh(player_index)
 end
 
 function tas.on_pre_removing_waypoint(waypoint_entity)
@@ -662,7 +674,6 @@ end
 function tas.on_clicked_waypoint(player_index, waypoint_entity)
     local indexes = tas.find_waypoint_from_entity(waypoint_entity)
     tas.select_waypoint(player_index, indexes.waypoint_index, indexes.sequence_index)
-    tas.gui.show_waypoint_info(player_index, indexes.sequence_index, indexes.waypoint_index)
 end
 
 function tas.on_clicked_ghost(player_index, ghost_entity)

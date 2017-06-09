@@ -25,10 +25,11 @@ function tas.gui.init_player(player_index)
 
     local playback = gui.editor.add { type = "flow", direction = "horizontal" }
     gui.playback = { }
-    gui.playback.play_pause = playback.add {type = "button", caption = "play", style="playback-button" }
+    gui.playback.reset = playback.add { type = "button", caption = "reset", style = "playback-button" }
+    gui.playback.play_pause = playback.add { type = "button", caption = "play", style = "playback-button" }
     gui.playback.step = playback.add { type = "button", caption = "step:", style = "playback-button" }
     gui.playback.step_ticks = playback.add { type = "textfield", caption = "# ticks", style = "playback-textfield" }
-    gui.playback.step_ticks.text = "30"
+    gui.playback.step_ticks.text = "10"
 
     gui.waypoint_mode = gui.editor.add { type = "button", caption = "insert waypoint" }
 
@@ -86,25 +87,28 @@ function tas.gui.show_entity_info(player_index, entity)
     gui.entity_object = entity
     gui.entity = gui.entity_container.add { type = "frame", direction = "vertical", caption = entity.localised_name }
 
-    local mine_order_exists = false
-    local selected_items = tas.try_get_player_data(player_index)
-    if selected_items ~= nil and selected_items.waypoint ~= nil then
-        if tas.find_mine_order_from_entity_and_waypoint(entity, selected_items.waypoint) ~= nil then
-            mine_order_exists = true
-        end
-    end
+    if entity.minable == true then
 
-    local mine = gui.entity.add { type = "checkbox", caption = "mine", state = mine_order_exists, name = util.get_guid() }
-    tas.gui.register_check_changed_callback(mine, function()
-        if mine.state == true then
-            tas.add_mine_order(player_index, entity)
-        else
-            local player_data = tas.try_get_player_data(player_index)
-            if player_data == nil then return end
-            local find_results = tas.find_mine_order_from_entity_and_waypoint(entity, player_data.waypoint)
-            tas.destroy_mine_order(find_results.mine_order)
+        local mine_order_exists = false
+        local selected_items = tas.try_get_player_data(player_index)
+        if selected_items ~= nil and selected_items.waypoint ~= nil then
+            if tas.find_mine_order_from_entity_and_waypoint(entity, selected_items.waypoint) ~= nil then
+                mine_order_exists = true
+            end
         end
-    end )
+
+        local mine = gui.entity.add { type = "checkbox", caption = "mine", state = mine_order_exists, name = util.get_guid() }
+        tas.gui.register_check_changed_callback(mine, function()
+            if mine.state == true then
+                tas.add_mine_order(player_index, entity)
+            else
+                local player_data = tas.try_get_player_data(player_index)
+                if player_data == nil then return end
+                local find_results = tas.find_mine_order_from_entity_and_waypoint(entity, player_data.waypoint)
+                tas.destroy_mine_order(find_results.mine_order)
+            end
+        end )
+    end
 end
 
 function tas.gui.hide_waypoint_info(player_index)
@@ -261,6 +265,8 @@ function tas.gui.on_click(event)
             tas.runner.pause(player_index, nil)
             element.caption = "play"
         end
+    elseif element == gui.playback.reset then
+        tas.runner.reset_runner()
     elseif element == gui.playback.play then
         tas.runner.play(player_index, nil)
     elseif element == gui.playback.pause then
