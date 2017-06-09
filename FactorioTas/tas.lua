@@ -511,7 +511,9 @@ function tas.on_built_waypoint(created_entity, player_index)
 end
 
 -- Creates a new build order table. ghost_entity can be nil.
-function tas.new_build_order_from_ghost_entity(ghost_entity, item_to_place_prototype)
+function tas.new_build_order_from_ghost_entity(ghost_entity)
+    
+    local item_to_place_prototype = ghost_entity.ghost_prototype.items_to_place_this
     return
     {
         surface = ghost_entity.surface,
@@ -559,18 +561,10 @@ function tas.on_built_ghost(created_ghost, player_index)
     end
 
     local player_data = tas.try_get_player_data(player_index)
-
-    local cursor_stack = game.players[player_index].cursor_stack
-
-    if cursor_stack.valid_for_read == false or cursor_stack.name == nil then
-        error("Could not create a build order because the item used to place it (LuaPlayer.item_stack) is nil or empty.")
-    elseif cursor_stack.prototype.place_result ~= created_ghost.ghost_prototype then
-        error("Could not create a build order because the ghost and the item held in the players hand do not match.")
-    end
-
+    
     if player_data == nil then return end
 
-    local build_order = tas.new_build_order_from_ghost_entity(created_ghost, cursor_stack.prototype)
+    local build_order = tas.new_build_order_from_ghost_entity(created_ghost)
 
     table.insert(player_data.waypoint.build_orders, build_order)
 end
