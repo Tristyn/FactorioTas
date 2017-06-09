@@ -3,7 +3,6 @@ tas.runner =
     playback_state =
     {
         paused = { },
-        playing = { },
         tick_1_prepare_to_attach_runner = { },
         tick_2_attach_runner = { },
         tick_3_running = { },
@@ -26,18 +25,19 @@ end
 -- Create a new runner and character entity
 -- Returns nil if sequence is empty
 function tas.runner.new_runner(sequence)
-    local start = sequence.waypoints[1]
+    local sequence_start = sequence.waypoints[1]
 
-    if start == nil then
+    if sequence_start == nil then
         return nil
     end
 
-    local character = start.surface.create_entity { name = "player", position = start.position, force = "player" }
+    local character = sequence_start.surface.create_entity { name = "player", position = sequence_start.position, force = "player" }
 
     -- insert items that are given at spawn
     local quickbar = character.get_inventory(defines.inventory.player_quickbar)
     quickbar.insert( { name = "burner-mining-drill", count = 1 })
     quickbar.insert( { name = "stone-furnace", count = 1 })
+    character.get_inventory(defines.inventory.player_main).insert( { name = "iron-plate", count = 8 })
 
     global.runner = {
         sequence = sequence,
@@ -55,7 +55,7 @@ end
 -- Removes (and murders) the runner.
 -- Returns if the runner was alive.
 function tas.runner.remove_runner()
-    if global.runner == nil then
+    if tas.runner.runner_exists() == false then
         return false
     end
 
@@ -67,6 +67,12 @@ function tas.runner.remove_runner()
     end
 
     global.runner = nil
+    return true
+end
+
+function tas.runner.reset_runner()
+    tas.runner.remove_runner()
+    tas.runner.ensure_runner_initialized()
 end
 
 function tas.runner.runner_exists()
@@ -446,6 +452,7 @@ function tas.runner.attach_player(player_entity, character)
     end
 end
 
+-- player_index is the user that will be controlled to run the sequence.
 -- setting num_ticks_to_step to nil denotes that it will step indefinitely
 function tas.runner.play(player_index, num_ticks_to_step)
     if global.runner_state.playback_state == tas.runner.playback_state.tick_1_prepare_to_attach_runner or
@@ -497,4 +504,9 @@ function tas.runner.on_pre_mined_entity(player_index, entity)
     if runner_character == player_character then
         global.runner.mining_finished_this_tick = true
     end
+end
+
+function tas.runner.is_playing(player_index)
+    -- When there are multiple runners, check only if there is a runner using this specfiic player_index
+    return global.runner_state.playback_state ~= tas.runner.playback_state.paused
 end

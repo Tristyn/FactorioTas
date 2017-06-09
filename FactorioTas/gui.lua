@@ -25,8 +25,7 @@ function tas.gui.init_player(player_index)
 
     local playback = gui.editor.add { type = "flow", direction = "horizontal" }
     gui.playback = { }
-    gui.playback.play = playback.add { type = "button", caption = "play", style = "playback-button" }
-    gui.playback.pause = playback.add { type = "button", caption = "pause", style = "playback-button" }
+    gui.playback.play_pause = playback.add {type = "button", caption = "play", style="playback-button" }
     gui.playback.step = playback.add { type = "button", caption = "step:", style = "playback-button" }
     gui.playback.step_ticks = playback.add { type = "textfield", caption = "# ticks", style = "playback-textfield" }
     gui.playback.step_ticks.text = "30"
@@ -253,6 +252,14 @@ function tas.gui.on_click(event)
         else
             gui.current_state = "move"
             gui.waypoint_mode.caption = "move waypoint"
+        end
+    elseif element == gui.playback.play_pause then
+        if element.caption == "play" then
+            tas.runner.play(player_index, nil)
+            element.caption = "pause"
+        else
+            tas.runner.pause(player_index, nil)
+            element.caption = "play"
         end
     elseif element == gui.playback.play then
         tas.runner.play(player_index, nil)

@@ -544,6 +544,10 @@ function tas.destroy_mine_order(mine_order)
 end
 
 function tas.on_built_ghost(created_ghost, player_index)
+    if tas.runner.is_playing(player_index) then
+        return
+    end
+
     local player_data = tas.try_get_player_data(player_index)
 
     local cursor_stack = game.players[player_index].cursor_stack
@@ -646,9 +650,12 @@ function tas.on_pre_mined_entity(event)
     if entity.name == "tas-waypoint" then
         tas.on_pre_removing_waypoint(entity)
     elseif entity.name == "entity-ghost" then
+        -- Note: factorio doesn't fire this event if a player builds on top of a ghost
         tas.on_pre_removing_ghost(entity)
     elseif entity.type == "resource" then
-        tas.on_pre_mined_resource(player_index, entity)
+        if not tas.runner.is_playing(player_index) then
+            tas.on_pre_mined_resource(player_index, entity)
+        end
     end
 end
 

@@ -6,7 +6,7 @@ constants = {
     base_build_distance = 6,
     -- from data.raw.player.player.build_distance
     character_inventories = { defines.inventory.player_main, defines.inventory.player_quickbar },
-    indev_screen_resolution = { x = 1362, y = 701 },
+    indev_screen_resolution = { x = 1918, y = 1013 },
     debug = true
 }
 

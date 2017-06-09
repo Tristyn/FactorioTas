@@ -4,7 +4,11 @@
       "fileName": "cmd.exe",
       "workingDirectory": ".",
       "arguments": "/c DeployToAppdata.bat"
+    },
+    "DeployToDesktop": {
+      "fileName": "cmd.exe",
+      "workingDirectory": ".",
+      "arguments": "/c DeployToDesktop.bat"
     }
-  }
-, "-vs-binding":{"AfterBuild":["DeployToAppdata"]}
+  }, "-vs-binding":{"AfterBuild":["DeployToDesktop"]}
 }
