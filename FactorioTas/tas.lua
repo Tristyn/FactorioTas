@@ -531,7 +531,7 @@ end
 
 -- Creates a new build order table. ghost_entity can be nil.
 function tas.new_build_order_from_ghost_entity(ghost_entity)
-    
+
     local item_to_place_prototype = ghost_entity.ghost_prototype.items_to_place_this
     return
     {
@@ -580,7 +580,7 @@ function tas.on_built_ghost(created_ghost, player_index)
     end
 
     local player_data = tas.try_get_player_data(player_index)
-    
+
     if player_data == nil then return end
 
     local build_order = tas.new_build_order_from_ghost_entity(created_ghost)
@@ -715,11 +715,21 @@ function tas.add_craft_order(player_index, recipe, count)
     local player_data = tas.try_get_player_data(player_index)
     if player_data == nil then return end
 
-    local craft_order = tas.new_craft_order(recipe, count)
+    local selected_waypoint_craft_orders = player_data.waypoint.craft_orders
+    local crafting_queue_end = selected_waypoint_craft_orders[#selected_waypoint_craft_orders]
 
-    table.insert(player_data.waypoint.craft_orders, craft_order)
-    
-    tas.gui.refresh(player_index)
+    -- Merge with the last order or apend a new order to the end
+    if crafting_queue_end ~= nil and recipe == crafting_queue_end.recipe then
+
+        crafting_queue_end.count = crafting_queue_end.count + count
+
+    else
+
+        local craft_order = tas.new_craft_order(recipe, count)
+        table.insert(player_data.waypoint.craft_orders, craft_order)
+
+    end
+
 end
 
 function tas.remove_craft_order(craft_order)
@@ -741,16 +751,16 @@ function tas.on_crafted_item(event)
         -- hook in replay crafting logic here?
         return
     end
-    
-    local player = game.players[player_index]
+
+    local player_entity = game.players[player_index]
 
     -- Determine the crafting recipe and store it as a runner crafting order
     -- This event is for each item crafted as well as what was clicked ("iron-axe" triggers
     -- both "iron-stick" with a count of 2 and "iron-axe" with a count of 1, assuming no "iron-sticks" are in the player's inventory)
     -- The trick to determine the top-level recipe is to set player.cheat_mode=true so that on_crafted_item fires exactly once when clicking the button to craft.
 
-    if player.cheat_mode == false then
-        msg_all({"TAS-err-generic", "Can not determine crafted item because cheat-mode is not enabled for " .. player.name .. "."})
+    if player_entity.cheat_mode == false then
+        msg_all( { "TAS-err-generic", "Can not determine crafted item because cheat-mode is not enabled for " .. player_entity.name .. "." })
         return
     end
 

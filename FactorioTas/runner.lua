@@ -52,6 +52,7 @@ function tas.runner.new_runner(sequence)
 
     tas.runner.activate_build_orders_in_waypoint(global.runner, 1)
     tas.runner.activate_mine_orders_in_waypoint(global.runner, 1)
+    tas.runner.activate_craft_orders_in_waypoint(global.runner, 1)
 end
 
 -- Removes (and murders) the runner.
@@ -337,7 +338,9 @@ end
 
 function tas.runner.activate_craft_orders_in_waypoint(runner, waypoint_index)
     for _, craft_order in ipairs(runner.sequence.waypoints[waypoint_index].craft_orders) do
-        runner.character.begin_crafting( { count = craft_order.count, recipe = craft_order.recipe, silent = false })
+        for i = 1, craft_order.count do
+            runner.character.begin_crafting( { count = 1, recipe = craft_order.recipe, silent = false })
+        end
     end
 end
 

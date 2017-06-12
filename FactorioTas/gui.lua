@@ -217,7 +217,7 @@ function tas.gui.refresh(player_index)
     end
 
     if gui.entity_object ~= nil then
-        tas.gui.show_entity_info(gui.entity_object)
+        tas.gui.show_entity_info(player_index, gui.entity_object)
     end
 end
 
