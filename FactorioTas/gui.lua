@@ -131,6 +131,7 @@ function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index
 
     -- delay
 
+    -- mine orders
     for _, mine_order in ipairs(waypoint.mine_orders) do
 
         -- only show mine orders from resources here, all other mine orders are from entity info
@@ -166,6 +167,30 @@ function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index
         end
     end
 
+    -- crafting queue
+    if #waypoint.craft_orders > 0 then
+        local num_columns = 10
+
+        gui.waypoint.add { type = "label", caption = "crafting queue" }
+
+        local queue_container = gui.waypoint.add { type = "flow", direction = "vertical" }
+        local queue_row
+
+        for i, craft_order in ipairs(waypoint.craft_orders) do
+            -- add a new row every n columns
+            if i % num_columns == 1 then
+                queue_row = queue_container.add { type = "flow", direction = "horizontal" }
+            end
+
+            local btn = queue_row.add( { type = "sprite-button", sprite = "item/" .. craft_order.recipe.name, style = mod_gui.button_style, name = util.get_guid() })
+            btn.add( { type = "label", caption = tostring(craft_order.count) })
+            tas.gui.register_click_callback(btn, function()
+                tas.remove_craft_order(craft_order)
+                tas.gui.unregister_click_callbacks(btn)
+                tas.gui.refresh(player_index)
+            end )
+        end
+    end
 end
 
 function tas.gui.mine_order_info_to_localised_string(mine_order)

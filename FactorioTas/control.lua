@@ -1,3 +1,4 @@
+require "mod-gui"
 require "util"
 require "tas"
 require "gui"
@@ -64,6 +65,11 @@ end )
 script.on_event(defines.events.on_robot_pre_mined, function(event)
 	local _, err = xpcall(tas.on_pre_mined_entity, debug.traceback, event)
 	if err then msg_all( { "TAS-err-specific", "on_robot_pre_mined", err }) end
+end )
+
+script.on_event(defines.events.on_player_crafted_item, function(event)
+	local _, err = xpcall(tas.on_crafted_item, debug.traceback, event)
+	if err then msg_all( { "TAS-err-specific", "on_crafted_item", err }) end
 end )
 
 script.on_event("tas-select-hotkey", function(event)

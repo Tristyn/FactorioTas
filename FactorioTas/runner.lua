@@ -38,6 +38,8 @@ function tas.runner.new_runner(sequence)
     quickbar.insert( { name = "burner-mining-drill", count = 1 })
     quickbar.insert( { name = "stone-furnace", count = 1 })
     character.get_inventory(defines.inventory.player_main).insert( { name = "iron-plate", count = 8 })
+    character.get_inventory(defines.inventory.player_guns).insert( { name = "pistol", count = 1 })
+    character.get_inventory(defines.inventory.player_ammo).insert( { name = "firearm-magazine", count = 10 })
 
     global.runner = {
         sequence = sequence,
@@ -145,7 +147,7 @@ function tas.runner.step_mining_state(runner, player)
     if mine_order == nil then
         return false
     end
-    
+
 
     if runner.mining_finished_this_tick == true then
         runner.mining_finished_this_tick = false
@@ -333,6 +335,12 @@ function tas.runner.step_build_state(runner, player)
     end
 end
 
+function tas.runner.activate_craft_orders_in_waypoint(runner, waypoint_index)
+    for _, craft_order in ipairs(runner.sequence.waypoints[waypoint_index].craft_orders) do
+        runner.character.begin_crafting( { count = craft_order.count, recipe = craft_order.recipe, silent = false })
+    end
+end
+
 function tas.runner.are_waypoint_goals_satisfied(runner, player)
     local waypoint = runner.sequence.waypoints[runner.waypoint_index]
     local walking_state = tas.runner.get_direction_to_waypoint(runner.character, waypoint)
@@ -370,6 +378,7 @@ function tas.runner.step_runner(runner, attached_player)
         tas.runner.move_towards_waypoint(character, runner.sequence.waypoints[runner.waypoint_index])
         tas.runner.activate_build_orders_in_waypoint(runner, runner.waypoint_index)
         tas.runner.activate_mine_orders_in_waypoint(runner, runner.waypoint_index)
+        tas.runner.activate_craft_orders_in_waypoint(runner, runner.waypoint_index)
     end
 end
 

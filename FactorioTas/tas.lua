@@ -154,7 +154,8 @@ function tas.new_waypoint(surface, position, waypoint_index, is_visible_in_game,
         entity = waypoint_entity,
         text_entity = text_entity,
         build_orders = { },
-        mine_orders = { }
+        mine_orders = { },
+        craft_orders = { }
     }
 end
 
@@ -353,6 +354,24 @@ function tas.get_mine_order_indexes(mine_order)
                     waypoint = waypoint,
                     waypoint_index = waypoint_index,
                     mine_order_index = mine_order_index
+                }
+            end
+        end
+    end
+end
+
+function tas.get_craft_order_indexes(craft_order)
+    for sequence_index, sequence in ipairs(global.sequences) do
+        for waypoint_index, waypoint in ipairs(sequence.waypoints) do
+            local craft_order_index = tas.scan_table_for_value(waypoint.craft_orders, function(order) return order end, craft_order)
+            if craft_order_index ~= nil then
+                return
+                {
+                    sequence = sequence,
+                    sequence_index = sequence_index,
+                    waypoint = waypoint,
+                    waypoint_index = waypoint_index,
+                    craft_order_index = craft_order_index
                 }
             end
         end
@@ -676,6 +695,68 @@ function tas.on_clicked_ghost(player_index, ghost_entity)
     if build_order_indexes == nil then return end
 
     tas.select_waypoint(player_index, build_order_indexes.waypoint_index, build_order_indexes.sequence_index)
+end
+
+-- recipe may be a string or LuaRecipe.
+-- count must be a positive number, nil denotes a count of 1.
+function tas.new_craft_order(recipe, count)
+    if count == nil then
+        count = 1
+    end
+
+    return
+    {
+        count = count,
+        recipe = recipe
+    }
+end
+
+function tas.add_craft_order(player_index, recipe, count)
+    local player_data = tas.try_get_player_data(player_index)
+    if player_data == nil then return end
+
+    local craft_order = tas.new_craft_order(recipe, count)
+
+    table.insert(player_data.waypoint.craft_orders, craft_order)
+    
+    tas.gui.refresh(player_index)
+end
+
+function tas.remove_craft_order(craft_order)
+    local indexes = tas.get_craft_order_indexes(craft_order)
+
+    if indexes == nil then return false end
+
+    table.remove(indexes.waypoint.craft_orders, indexes.craft_order_index)
+
+    return true
+end
+
+function tas.on_crafted_item(event)
+    local item_stack = event.item_stack
+    local player_index = event.player_index
+    local recipe = event.recipe
+
+    if tas.runner.is_playing(player_index) then
+        -- hook in replay crafting logic here?
+        return
+    end
+    
+    local player = game.players[player_index]
+
+    -- Determine the crafting recipe and store it as a runner crafting order
+    -- This event is for each item crafted as well as what was clicked ("iron-axe" triggers
+    -- both "iron-stick" with a count of 2 and "iron-axe" with a count of 1, assuming no "iron-sticks" are in the player's inventory)
+    -- The trick to determine the top-level recipe is to set player.cheat_mode=true so that on_crafted_item fires exactly once when clicking the button to craft.
+
+    if player.cheat_mode == false then
+        msg_all({"TAS-err-generic", "Can not determine crafted item because cheat-mode is not enabled for " .. player.name .. "."})
+        return
+    end
+
+    tas.add_craft_order(player_index, recipe, item_stack.count / recipe.products[1].amount)
+    tas.gui.refresh(player_index)
+
 end
 
 function tas.on_left_click(event)
