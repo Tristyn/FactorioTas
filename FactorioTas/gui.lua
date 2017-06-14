@@ -7,6 +7,8 @@ function tas.gui.init_globals()
 end
 
 function tas.gui.init_player(player_index)
+    fail_if_missing(player_index)
+
     local gui = { }
     global.players[player_index].gui = gui
 
@@ -39,6 +41,8 @@ function tas.gui.init_player(player_index)
 end
 
 function tas.gui.show_editor(player_index)
+    fail_if_missing(player_index)
+
     tas.gui.hide_editor(player_index)
 
     local gui = global.players[player_index].gui
@@ -48,6 +52,8 @@ function tas.gui.show_editor(player_index)
 end
 
 function tas.gui.hide_editor(player_index)
+    fail_if_missing(player_index)
+
     local gui = global.players[player_index].gui
 
     gui.root.style.visible = false
@@ -55,6 +61,8 @@ function tas.gui.hide_editor(player_index)
 end
 
 function tas.gui.toggle_editor_visible(player_index)
+    fail_if_missing(player_index)
+
     if global.gui.editor == nil then
         tas.gui.show_editor(player_index)
     else
@@ -63,10 +71,14 @@ function tas.gui.toggle_editor_visible(player_index)
 end
 
 function tas.gui.reset_waypoint_toggles(player_index)
+    fail_if_missing(player_index)
+
     global.players[player_index].gui.waypoint_mode.caption = "insert waypoint"
 end
 
 function tas.gui.hide_entity_info(player_index)
+    fail_if_missing(player_index)
+
     local gui = global.players[player_index].gui
 
     if gui.entity ~= nil then
@@ -76,6 +88,9 @@ function tas.gui.hide_entity_info(player_index)
 end
 
 function tas.gui.show_entity_info(player_index, entity)
+    fail_if_missing(player_index)
+    fail_if_missing(entity)
+
     tas.gui.hide_entity_info(player_index)
 
     if entity.minable ~= true or entity.type == "resource" then
@@ -112,6 +127,8 @@ function tas.gui.show_entity_info(player_index, entity)
 end
 
 function tas.gui.hide_waypoint_info(player_index)
+    fail_if_missing(player_index)
+
     local gui = global.players[player_index].gui
 
     if gui.waypoint ~= nil then
@@ -121,6 +138,10 @@ function tas.gui.hide_waypoint_info(player_index)
 end
 
 function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index)
+    fail_if_missing(player_index)
+    fail_if_missing(sequence_index)
+    fail_if_missing(waypoint_index)
+
     tas.gui.hide_waypoint_info(player_index)
 
     local waypoint = global.sequences[sequence_index].waypoints[waypoint_index]
@@ -194,6 +215,7 @@ function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index
 end
 
 function tas.gui.mine_order_info_to_localised_string(mine_order)
+    fail_if_missing(mine_order)
     return { "TAS-mine-order-info", mine_order.count, mine_order.entity.localised_name }
 end
 
@@ -210,6 +232,8 @@ function tas.gui.set_entity_reference_count(num_entity_references)
 end
 
 function tas.gui.refresh(player_index)
+    fail_if_missing(player_index)
+
     local gui = global.players[player_index].gui
 
     if gui.sequence_index ~= nil and gui.waypoint_index ~= nil then
@@ -235,6 +259,8 @@ function tas.gui.register_click_callback(element, callback)
 end
 
 function tas.gui.unregister_click_callbacks(...)
+    fail_if_missing(...)
+
     for _, element in ipairs(...) do
         global.gui.click_event_callbacks[element.name] = nil
     end
@@ -254,12 +280,16 @@ function tas.gui.register_check_changed_callback(checkbox_element, callback)
 end
 
 function tas.gui.unregister_check_changed_callbacks(...)
+    fail_if_missing(...)
+
     for _, element in ipairs(...) do
         global.gui.check_changed_callbacks[element.name] = nil
     end
 end
 
 function tas.gui.on_click(event)
+    fail_if_missing(event)
+
     local element = event.element
     local player_index = event.player_index
     local gui = global.players[player_index].gui
@@ -305,6 +335,8 @@ function tas.gui.on_click(event)
 end
 
 function tas.gui.on_check_changed(event)
+    fail_if_missing(event)
+
     local element = event.element
     local callback = global.gui.check_changed_callbacks[element.name]
     if callback ~= nil then

@@ -38,6 +38,7 @@
     <Content Include="FactorioTas\graphics\entity\waypoint.xcf" />
     <Content Include="FactorioTas\info.json" />
     <Content Include="FactorioTas\locale\en\base.cfg" />
+    <None Include="FactorioTas\saves\v0.15 map exchange string.txt" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="FactorioTas\control.lua" />
@@ -63,6 +64,7 @@
     <Folder Include="FactorioTas\graphics\beam\" />
     <Folder Include="FactorioTas\locale\" />
     <Folder Include="FactorioTas\locale\en\" />
+    <Folder Include="FactorioTas\saves\" />
     <Folder Include="FactorioTas\prototypes\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" />
