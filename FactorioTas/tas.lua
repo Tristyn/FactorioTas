@@ -649,7 +649,7 @@ function tas.on_pre_removing_waypoint(waypoint_entity)
 
     -- Remove the waypoint and shift all others to the left
     table.remove(find_result.sequence.waypoints, find_result.waypoint_index)
-
+    
     -- All waypoint elements after waypoint_index have been shifted left.
     -- Any stored waypoint indexes > waypoint_index must be realigned.
     tas.realign_waypoint_indexes(find_result.sequence_index, find_result.waypoint_index, -1)
@@ -682,19 +682,6 @@ function tas.on_pre_mined_entity(event)
             tas.on_pre_mined_resource(player_index, entity)
         end
     end
-end
-
-function tas.on_clicked_waypoint(player_index, waypoint_entity)
-    local indexes = tas.find_waypoint_from_entity(waypoint_entity)
-    tas.select_waypoint(player_index, indexes.waypoint_index, indexes.sequence_index)
-end
-
-function tas.on_clicked_ghost(player_index, ghost_entity)
-    local build_order_indexes = tas.find_build_order_from_entity(ghost_entity)
-
-    if build_order_indexes == nil then return end
-
-    tas.select_waypoint(player_index, build_order_indexes.waypoint_index, build_order_indexes.sequence_index)
 end
 
 -- recipe may be a string or LuaRecipe.
@@ -766,6 +753,23 @@ function tas.on_crafted_item(event)
 
     tas.add_craft_order(player_index, recipe, item_stack.count / recipe.products[1].amount)
     tas.gui.refresh(player_index)
+
+end
+
+function tas.on_clicked_waypoint(player_index, waypoint_entity)
+    local indexes = tas.find_waypoint_from_entity(waypoint_entity)
+    tas.select_waypoint(player_index, indexes.waypoint_index, indexes.sequence_index)
+end
+
+function tas.on_clicked_ghost(player_index, ghost_entity)
+    local build_order_indexes = tas.find_build_order_from_entity(ghost_entity)
+
+    if build_order_indexes == nil then return end
+
+    tas.select_waypoint(player_index, build_order_indexes.waypoint_index, build_order_indexes.sequence_index)
+end
+
+function tas.on_clicked_container(player_index, container_entity)
 
 end
 

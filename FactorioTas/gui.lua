@@ -152,10 +152,10 @@ function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index
 
     -- delay
 
-    -- mine orders
+    -- mine orders targeted at resources
     for _, mine_order in ipairs(waypoint.mine_orders) do
 
-        -- only show mine orders from resources here, all other mine orders are from entity info
+        -- only show mine orders from resources here
         if mine_order.entity.type == "resource" then
 
             -- collect all controls for a mine order into a single frame for easy removal later
@@ -193,25 +193,60 @@ function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index
         local num_columns = 10
 
         gui.waypoint.add { type = "label", caption = "crafting queue" }
+        local craft_orders_as_inventory = tas.gui.craft_orders_to_inventory(waypoint.craft_orders)
+        tas.gui.build_inventory_grid_control(gui.waypoint, craft_orders_as_inventory, 10, function(event)
+            tas.remove_craft_order(waypoint.craft_orders[event.item_stack_index])
+            tas.gui.unregister_click_callbacks(event.gui_element)
+            tas.gui.refresh(event.player_index)
+        end )
+    end
+end
 
-        local queue_container = gui.waypoint.add { type = "flow", direction = "vertical" }
-        local queue_row
+-- Transforms a collection of craft_orders to a collection of SimpleItemStack
+-- See http://lua-api.factorio.com/latest/Concepts.html#SimpleItemStack
+function tas.gui.craft_orders_to_inventory(craft_orders)
+    local inventory = { }
+    local inventory_index = 1
 
-        for i, craft_order in ipairs(waypoint.craft_orders) do
-            -- add a new row every n columns
-            if i % num_columns == 1 then
-                queue_row = queue_container.add { type = "flow", direction = "horizontal" }
-            end
+    for i, craft_order in ipairs(craft_orders) do
+        --[[
+        if #inventory > 0 and craft_order.name == inventory[#inventory].name then
+            -- fast-path, merge with the top item stack
+        end
+        --]]
 
-            local btn = queue_row.add( { type = "sprite-button", sprite = "item/" .. craft_order.recipe.name, style = mod_gui.button_style, name = util.get_guid() })
-            btn.add( { type = "label", caption = tostring(craft_order.count) })
-            tas.gui.register_click_callback(btn, function()
-                tas.remove_craft_order(craft_order)
-                tas.gui.unregister_click_callbacks(btn)
-                tas.gui.refresh(player_index)
+        local simple_item_stack = { recipe_name = craft_order.recipe.name, count = craft_order.count }
+        table.insert(inventory, simple_item_stack)
+    end
+
+    return inventory
+end
+
+-- inventory is a collection of SimpleItemStack
+-- on_item_stack_clicked_callback accepts a table with the fields { gui_element, player_index, inventory, item_stack, item_stack_index }
+-- returns the root flow container elemnt for the inventory
+function tas.gui.build_inventory_grid_control(container_frame, inventory, num_columns, on_item_stack_clicked_callback)
+    local inventory_container = container_frame.add { type = "flow", direction = "vertical" }
+    local inventory_row
+
+    -- item_stack is SimpleItemStack. See http://lua-api.factorio.com/latest/Concepts.html#SimpleItemStack
+    for i, item_stack in ipairs(inventory) do
+        -- add a new row every n columns
+        if i % num_columns == 1 then
+            inventory_row = inventory_container.add { type = "flow", direction = "horizontal" }
+        end
+
+        local btn = inventory_row.add( { type = "sprite-button", sprite = "recipe/" .. item_stack.recipe_name, style = mod_gui.button_style, name = util.get_guid() })
+        btn.add( { type = "label", caption = tostring(item_stack.count) })
+
+        if on_item_stack_clicked_callback ~= nil then
+            tas.gui.register_click_callback(btn, function(element, player_index)
+                on_item_stack_clicked_callback( { gui_element = btn, player_index = player_index, inventory = inventory, item_stack = item_stack, item_stack_index = i })
             end )
         end
     end
+
+    return inventory_container
 end
 
 function tas.gui.mine_order_info_to_localised_string(mine_order)
