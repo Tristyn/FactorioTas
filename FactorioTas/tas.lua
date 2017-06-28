@@ -649,7 +649,7 @@ function tas.on_pre_removing_waypoint(waypoint_entity)
 
     -- Remove the waypoint and shift all others to the left
     table.remove(find_result.sequence.waypoints, find_result.waypoint_index)
-    
+
     -- All waypoint elements after waypoint_index have been shifted left.
     -- Any stored waypoint indexes > waypoint_index must be realigned.
     tas.realign_waypoint_indexes(find_result.sequence_index, find_result.waypoint_index, -1)
@@ -747,11 +747,15 @@ function tas.on_crafted_item(event)
     -- The trick to determine the top-level recipe is to set player.cheat_mode=true so that on_crafted_item fires exactly once when clicking the button to craft.
 
     if player_entity.cheat_mode == false then
-        msg_all( { "TAS-err-generic", "Can not determine crafted item because cheat-mode is not enabled for " .. player_entity.name .. "." })
-        return
+        error("Can not determine crafted item because cheat-mode is not enabled for " .. player_entity.name .. ".")
+    end
+
+    if #recipe.products ~= 1 then
+        error("No support for crafting recipes with zero or multiple products.")
     end
 
     tas.add_craft_order(player_index, recipe, item_stack.count / recipe.products[1].amount)
+    util.remove_item_stack(player_entity, constants.character_inventories, item_stack)
     tas.gui.refresh(player_index)
 
 end
@@ -767,10 +771,6 @@ function tas.on_clicked_ghost(player_index, ghost_entity)
     if build_order_indexes == nil then return end
 
     tas.select_waypoint(player_index, build_order_indexes.waypoint_index, build_order_indexes.sequence_index)
-end
-
-function tas.on_clicked_container(player_index, container_entity)
-
 end
 
 function tas.on_left_click(event)

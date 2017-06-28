@@ -284,7 +284,7 @@ function tas.runner.step_build_state(runner, player)
         if tas.runner.move_items(player.cursor_stack, item_to_place, character, constants.character_inventories) == true then
             runner.build_order_progress = 2
         else
-            msg_all( { "TAS-err-generic", "Could not move items from the players hand into inventory because there wasn't room. Cheating and deleting extra items.." })
+            msg_all( { "TAS-err-generic", "Could not move items from the players hand into inventory because there wasn't room. Using cheats to delete the extra items.." })
             player.cursor_stack.clear()
             tas.runner.move_items(player.cursor_stack, item_to_place, character, constants.character_inventories)
         end
@@ -402,7 +402,11 @@ function tas.runner.on_tick()
 
         tas.runner.attach_player(player, global.runner.character)
 
-        global.runner_state.playback_state = tas.runner.playback_state.tick_3_running
+        if global.runner_state.num_ticks_to_step ~= nil and global.runner_state.num_ticks_to_step == 0 then
+            global.runner_state.playback_state = tas.runner.playback_state.tick_4_prepare_to_attach_player
+        else    
+            global.runner_state.playback_state = tas.runner.playback_state.tick_3_running
+        end
 
     elseif global.runner_state.playback_state == tas.runner.playback_state.tick_3_running then
 
@@ -411,8 +415,8 @@ function tas.runner.on_tick()
         -- decrement num_ticks_to_step and check if we should start to pause
         if global.runner_state.num_ticks_to_step ~= nil then
             global.runner_state.num_ticks_to_step = global.runner_state.num_ticks_to_step - 1
-
-            if global.runner_state.num_ticks_to_step == 0 then
+            
+            if global.runner_state.num_ticks_to_step <= 0 then
                 global.runner_state.playback_state = tas.runner.playback_state.tick_4_prepare_to_attach_player
             end
         end

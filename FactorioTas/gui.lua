@@ -102,6 +102,7 @@ function tas.gui.show_entity_info(player_index, entity)
     gui.entity_object = entity
     gui.entity = gui.entity_container.add { type = "frame", direction = "vertical", caption = entity.localised_name }
 
+    -- entity mine order
     if entity.minable == true then
 
         local mine_order_exists = false
@@ -124,6 +125,12 @@ function tas.gui.show_entity_info(player_index, entity)
             end
         end )
     end
+
+    -- inventory transfer ui
+    -- transfer mode button: stack/item
+    -- container inventory
+    -- your inventories (dropdown?)
+    -- creates inventory transfer orders in the waypoint
 end
 
 function tas.gui.hide_waypoint_info(player_index)
@@ -177,7 +184,7 @@ function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index
                 tas.set_mine_order_count(mine_order, mine_order.count - 1)
                 mine_order_label.caption = tas.gui.mine_order_info_to_localised_string(mine_order)
             end )
-
+            
             local destroy = button_frame.add { type = "button", caption = "x", style = "playback-button", name = util.get_guid() }
             tas.gui.register_click_callback(destroy, function()
                 tas.destroy_mine_order(mine_order)

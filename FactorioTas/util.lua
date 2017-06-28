@@ -4,8 +4,17 @@ constants = {
 
     base_walking_speed = 0.14844,
     base_build_distance = 6,
-    -- from data.raw.player.player.build_distance
-    character_inventories = { defines.inventory.player_main, defines.inventory.player_quickbar },
+    -- from data.raw.player.player.build_distance; the field is not avaiable during gameplay so it is hardcoded here)
+    character_inventories =
+    {
+        defines.inventory.player_main,
+        defines.inventory.player_quickbar,
+        defines.inventory.player_guns,
+        defines.inventory.player_ammo,
+        defines.inventory.player_armor,
+        defines.inventory.player_tools,
+        defines.inventory.player_vehicle
+    },
     indev_screen_resolution = { x = 1918, y = 1013 },
     debug = true
 }
@@ -196,6 +205,32 @@ function util.find_item_stack(entity, inventories, name)
 
         end
     end
+end
+
+-- Removes a SimpleItemStack from the inventories. May remove multiple stacks and remove from multiple inventories across the entity.
+-- Does not support removing durability or ammo count, but can be extended to support those cases.
+-- Returns the number of items actually removed.
+function util.remove_item_stack(entity, inventories, item_stack_to_remove)
+    local num_to_remove = item_stack_to_remove.count
+
+    for _, inventory_id in pairs(inventories) do
+        local inventory = entity.get_inventory(inventory_id)
+
+        if inventory ~= nil then
+
+            local num_removed = inventory.remove( { name = item_stack_to_remove.name, count = num_to_remove })
+            num_to_remove = num_to_remove - num_removed
+
+            -- The specified number of items have been removed
+            if num_to_remove == 0 then
+                return item_stack_to_remove.count
+            end
+        end
+    end
+
+    -- Not all items were removed, return the number that were removed
+    return item_stack_to_remove.count - num_to_remove
+
 end
 
 -- Inserts the item into the first empty slot of the the inventories. Does not reduce the 'count' property of the item_stack parameter.
