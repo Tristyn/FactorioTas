@@ -136,6 +136,28 @@ function tas.insert_arrow_into_auto_update_respository(arrow_facade)
     global.arrow_auto_update_repository[arrow_facade] = arrow_facade
 end
 
+-- [Comment]
+-- Notifies the user and sets cheat mode to true if it is currently false.
+-- `player` can be a LuaPlayer, LuaCharacter or uint.
+function tas.ensure_cheat_mode_enabled(player)
+    fail_if_missing(player)
+
+    local player_entity = nil
+    game.print(type(player))
+    if type(player) == "userdata" then
+        player_entity = player
+    elseif type(player) == "number" then
+        player_entity = game.players[player]
+    else
+        error("`player` must be a LuaPlayer, LuaCharacter or uint.")
+    end
+
+    if player_entity.cheat_mode == false then
+        player_entity.print( "[TAS] Editor: Enabling cheat mode." )
+        player_entity.cheat_mode = true
+    end
+end
+
 -- Creates a new waypoint table. waypoint_entity can be nil.
 function tas.new_waypoint(surface, position, waypoint_index, is_visible_in_game, waypoint_entity)
     local text_entity
@@ -155,12 +177,13 @@ function tas.new_waypoint(surface, position, waypoint_index, is_visible_in_game,
         text_entity = text_entity,
         build_orders = { },
         mine_orders = { },
-        craft_orders = { }
+        craft_orders = { },
+        item_transfer_orders = { }
     }
 end
 
 -- creates a new sequence and returns it's index in the sequence table
-function tas.new_sequence(add_spawn_waypoint)
+function tas.new_sequence(add_spawn_waypoint, add_initial_crafting_queue)
     local sequence_index = #global.sequences + 1
 
 
@@ -173,6 +196,10 @@ function tas.new_sequence(add_spawn_waypoint)
         local origin = { x = 0, y = 0 }
 
         sequence.waypoints[1] = tas.new_waypoint(surface, origin, 1, true)
+
+        if add_initial_crafting_queue == true then
+            tas.add_craft_order(sequence.waypoints[1], "iron-axe", 1)
+        end
     end
 
     global.sequences[sequence_index] = sequence
@@ -199,7 +226,7 @@ function tas.ensure_first_sequence_initialized(add_spawn_waypoint)
     end
 
     if add_spawn_waypoint then
-        game.print("Placing the initial waypoint at spawn..")
+        game.print("[TAS] Placing the initial waypoint at spawn.")
     end
     tas.new_sequence(add_spawn_waypoint)
 end
@@ -226,7 +253,7 @@ function tas.realign_sequence_indexes(start_index, shift)
     end
 end
 
-function tas.remove_sequence(sequence_index)
+function tas.destoy_sequence(sequence_index)
     table.remove(global.sequences, sequence_index)
 
     tas.realign_sequence_indexes(sequence_index, -1)
@@ -257,9 +284,14 @@ function tas.scan_table_for_value(table, selector, value)
     end
 end
 
+function tas.select_waypoints_in_sequences()
+    return collections.select_many(global.sequences, function(sequence) return sequence.waypoints end)
+end
+
 function tas.find_waypoint_from_entity(waypoint_entity)
     -- iterate all waypoints of all sequences to find a match
     for sequence_index, sequence in ipairs(global.sequences) do
+
         local waypoint_index = tas.scan_table_for_value(sequence.waypoints, function(waypoint) return waypoint.entity end, waypoint_entity)
         if waypoint_index ~= nil then
             return {
@@ -372,6 +404,24 @@ function tas.get_craft_order_indexes(craft_order)
                     waypoint = waypoint,
                     waypoint_index = waypoint_index,
                     craft_order_index = craft_order_index
+                }
+            end
+        end
+    end
+end
+
+function tas.get_item_transfer_order_indexes(item_transfer_order)
+    for sequence_index, sequence in ipairs(global.sequences) do
+        for waypoint_index, waypoint in ipairs(sequence.waypoints) do
+            local item_transfer_order_index = tas.scan_table_for_value(waypoint.item_transfer_orders, function(order) return order end, item_transfer_order)
+            if item_transfer_order_index ~= nil then
+                return
+                {
+                    sequence = sequence,
+                    sequence_index = sequence_index,
+                    waypoint = waypoint,
+                    waypoint_index = waypoint_index,
+                    item_transfer_order_index = item_transfer_order_index
                 }
             end
         end
@@ -687,6 +737,7 @@ end
 -- recipe may be a string or LuaRecipe.
 -- count must be a positive number, nil denotes a count of 1.
 function tas.new_craft_order(recipe, count)
+
     if count == nil then
         count = 1
     end
@@ -698,14 +749,15 @@ function tas.new_craft_order(recipe, count)
     }
 end
 
-function tas.add_craft_order(player_index, recipe, count)
-    local player_data = tas.try_get_player_data(player_index)
-    if player_data == nil then return end
+function tas.add_craft_order(waypoint, recipe, count)
+    fail_if_missing(waypoint)
+    fail_if_missing(recipe)
+    fail_if_missing(count)
 
-    local selected_waypoint_craft_orders = player_data.waypoint.craft_orders
-    local crafting_queue_end = selected_waypoint_craft_orders[#selected_waypoint_craft_orders]
+    local craft_orders = waypoint.craft_orders
+    local crafting_queue_end = craft_orders[#craft_orders]
 
-    -- Merge with the last order or apend a new order to the end
+    -- Merge with the last order or append a new order to the end
     if crafting_queue_end ~= nil and recipe == crafting_queue_end.recipe then
 
         crafting_queue_end.count = crafting_queue_end.count + count
@@ -713,13 +765,13 @@ function tas.add_craft_order(player_index, recipe, count)
     else
 
         local craft_order = tas.new_craft_order(recipe, count)
-        table.insert(player_data.waypoint.craft_orders, craft_order)
+        table.insert(waypoint.craft_orders, craft_order)
 
     end
 
 end
 
-function tas.remove_craft_order(craft_order)
+function tas.destroy_craft_order(craft_order)
     local indexes = tas.get_craft_order_indexes(craft_order)
 
     if indexes == nil then return false end
@@ -727,6 +779,75 @@ function tas.remove_craft_order(craft_order)
     table.remove(indexes.waypoint.craft_orders, indexes.craft_order_index)
 
     return true
+end
+
+function tas.new_item_transfer_order(container_entity, is_player_receiving, player_inventory, container_inventory, items_to_transfer)
+    if container_entity ~= util.get_inventory_owner(container_inventory) then
+        error()
+    end
+
+    if items_to_transfer.count == nil then items_to_transfer.count = 1 end
+
+    return
+    {
+        is_player_receiving = is_player_receiving,
+        container_entity = container_entity,
+        container_inventory = container_inventory,
+        player_inventory = player_inventory,
+        item_stack = items_to_transfer
+    }
+end
+
+function tas.add_item_transfer_order(player_index, is_player_receiving, player_inventory, container_entity, container_inventory, items_to_transfer)
+    local player_data = tas.try_get_player_data(player_index)
+    if player_data == nil then error("Could not create a item transfer order because no waypoint was selected.") end
+    local existing_orders = player_data.waypoint.item_transfer_orders
+
+    local order = tas.new_item_transfer_order(container_entity, is_player_receiving, player_inventory, container_inventory, items_to_transfer)
+
+    -- If we can't merge the order, append it
+    if not tas.try_merge_item_transfer_order_with_collection(order, existing_orders) then
+        table.insert(existing_orders, order)
+    end
+
+
+end
+
+function tas.destroy_item_transfer_order(item_transfer_order)
+    local indexes = tas.get_item_transfer_order_indexes(item_transfer_order)
+    if indexes == nil then return false end
+
+    table.remove(indexes.waypoint.item_transfer_orders, indexes.item_transfer_order_index)
+
+    return true
+end
+
+function tas.can_item_transfer_orders_be_merged(order_a, order_b)
+    return order_a.item_stack.name == order_b.item_stack.name
+    and order_a.is_player_receiving == order_b.is_player_receiving
+    and order_a.source_inventory == order_b.source_inventory
+    and order_a.target_inventory == order_b.target_inventory
+end
+
+function tas.merge_item_transfer_orders(source, destination)
+    if not tas.can_item_transfer_orders_be_merged(source, destination) then
+        error("Attempted to merge two item transfer orders that are incompatible.")
+    end
+
+    destination.count = destination.item_stack.count + source.item_stack.count
+    source.item_stack.count = 0
+    -- Not actually needed for bug free code but let's throw this in for safety
+end
+
+function tas.try_merge_item_transfer_order_with_collection(item_transfer_order, item_transfer_order_collection)
+    for existing_order_index, existing_order in ipairs(item_transfer_order_collection) do
+        if tas.can_item_transfer_orders_be_merged(item_transfer_order, existing_order) then
+            tas.merge_item_transfer_orders(item_transfer_order, existing_order)
+            return true
+        end
+    end
+
+    return false
 end
 
 function tas.on_crafted_item(event)
@@ -753,9 +874,12 @@ function tas.on_crafted_item(event)
     if #recipe.products ~= 1 then
         error("No support for crafting recipes with zero or multiple products.")
     end
-
-    tas.add_craft_order(player_index, recipe, item_stack.count / recipe.products[1].amount)
-    util.remove_item_stack(player_entity, constants.character_inventories, item_stack)
+    
+    local player_data = tas.try_get_player_data(player_index)
+    if player_data == nil then error("Could not create a craft order because no waypoint was selected.") end
+    tas.add_craft_order(player_data.waypoint, recipe, item_stack.count / recipe.products[1].amount)
+    game.print(item_stack.count)
+    game.print(util.remove_item_stack(player_entity, item_stack, constants.character_inventories, true))
     tas.gui.refresh(player_index)
 
 end
@@ -909,7 +1033,7 @@ end
 
 function tas.update_debug_entity_count()
     local num_api_objects = 0
-    for _, field in util.pairs_recursive(global, "table") do
+    for _, field in collections.pairs_recursive(global, "table") do
         if type(field) == "userdata" or type(field.__self) == "userdata" then
             num_api_objects = num_api_objects + 1
         end
@@ -923,9 +1047,9 @@ function tas.on_tick(event)
 
     tas.update_arrow_repository()
 
-    if constants.debug == true then
-        -- tas.update_debug_entity_count()
-    end
+    -- if constants.debug == true then
+    -- tas.update_debug_entity_count()
+    -- end
 
     tas.runner.on_tick()
 end

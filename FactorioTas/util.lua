@@ -207,30 +207,46 @@ function util.find_item_stack(entity, inventories, name)
     end
 end
 
--- Removes a SimpleItemStack from the inventories. May remove multiple stacks and remove from multiple inventories across the entity.
+-- [Comment]
+-- Removes a SimpleItemStack `item_stack` from the inventories. May remove multiple stacks and remove from multiple inventories across the entity.
 -- Does not support removing durability or ammo count, but can be extended to support those cases.
 -- Returns the number of items actually removed.
-function util.remove_item_stack(entity, inventories, item_stack_to_remove)
-    local num_to_remove = item_stack_to_remove.count
+function util.remove_item_stack(entity, item_stack, inventories, include_player_cursor_stack)
+    local num_to_remove = item_stack.count
 
     for _, inventory_id in pairs(inventories) do
         local inventory = entity.get_inventory(inventory_id)
-
+        
         if inventory ~= nil then
 
-            local num_removed = inventory.remove( { name = item_stack_to_remove.name, count = num_to_remove })
+            local num_removed = inventory.remove( { name = item_stack.name, count = num_to_remove })
             num_to_remove = num_to_remove - num_removed
-
+            game.print(inventory_id .. ", num_removed = " .. num_removed)
             -- The specified number of items have been removed
             if num_to_remove == 0 then
-                return item_stack_to_remove.count
+                return item_stack.count
             end
+        else
+            game.print("Nil!")
         end
+
     end
 
-    -- Not all items were removed, return the number that were removed
-    return item_stack_to_remove.count - num_to_remove
+    if include_cursor_stack == true then
+        
 
+        local num_removed = math.min(item_stack.count, num_to_remove)
+        item_stack.count = item_stack.count - num_removed
+        num_to_remove = num_to_remove - num_removed
+
+    end
+
+    if num_to_remove < 0 then
+        error("This should never happen")
+    end
+
+    -- Not all items were removed, return the number that were actually removed.
+    return item_stack.count - num_to_remove
 end
 
 -- Inserts the item into the first empty slot of the the inventories. Does not reduce the 'count' property of the item_stack parameter.
@@ -261,82 +277,113 @@ function util.insert_into_inventories(entity, inventories, items)
     return inserted_tally
 end
 
--- Performs a breadth first iteration over all key-values in a table
--- Key-values may be returned multiple times. Cyclical graphs are OK.
--- parameter types_whitelist is a string or table of strings which denotes the list of types
---  (as strings) that will be returned in the traversal. nil will return all fields.
-function util.pairs_recursive(table_, types_whitelist)
-    -- define table_ do not give a different meaning to table.insert()
+function util.get_inventory_owner(inventory)
+    -- LuaInventory has fields entity_owner and player_owner. Only one is not nil, and when the owner is a player it depends on how the inventory was acquired.
+    -- player_owner is set when player.get_inventory is used, and entity_owner is set when player.character.get_inventory is used
+    -- Avoid that nonsense with this method
+    -- May return nil if the inventory does not belong to any entity
 
-    local function iterator(table_stack, seen)
+    local owner = inventory.entity_owner
+    if owner ~= nil then return owner end
+    return inventory.player_owner
+end
 
-        if #table_stack == 0 then
-            -- iteration complete
-            return nil, nil, false
-        end
+util.entity = { }
 
-        local top = table_stack[#table_stack]
-        local tab = top.table
-        local index = top.index
-        local value
+local entity_type_to_inventories_map = {
+    ["player"] =
+    {
+        { id = defines.inventory.player_main, name = "Backpack" },
+        { id = defines.inventory.player_quickbar, name = "Quickbar" },
+        { id = defines.inventory.player_guns, name = "Guns" },
+        { id = defines.inventory.player_ammo, name = "Ammo" },
+        { id = defines.inventory.player_armor, name = "Armor" },
+        { id = defines.inventory.player_tools, name = "Tools" },
+        { id = defines.inventory.player_trash, name = "Trash" }
+    },
+    ["container"] = { { id = defines.inventory.chest, name = "Chest" } },
+    ["locomotive"] = { { id = defines.inventory.fuel, name = "Train Fuel" } },
+    ["cargo-wagon"] = { { id = defines.inventory.cargo_wagon, name = "Cargo Wagon" } },
+    ["car"] =
+    {
+        { id = defines.inventory.fuel, name = "Car Fuel" },
+        { id = defines.inventory.car_ammo, name = "Car Ammo" },
+        { id = defines.inventory.car_trunk, name = "Car Trunk" }
+    },
+    ["roboport_robot"] =
+    {
+        { id = defines.inventory.roboport_robot, name = "Roboport Robots" },
+        { id = defines.inventory.roboport_material, name = "Roboport Repair Packs" }
+    },
+    ["boiler"] = { { id = defines.inventory.fuel, name = "Boiler Fuel" } },
+    ["mining-drill"] =
+    {
+        { id = defines.inventory.fuel, name = "Fuel" },
+        { id = defines.inventory.mining_drill_modules, name = "Modules" }
+    },
+    ["furnace"] =
+    {
+        { id = defines.inventory.fuel, name = "Furnace Fuel" },
+        { id = defines.inventory.furnace_source, name = "Input" },
+        { id = defines.inventory.furnace_result, name = "Output" },
+        { id = defines.inventory.furnace_modules, name = "Modules" }
+    },
+    ["assembling-machine"] =
+    {
+        { id = defines.inventory.assembling_machine_input, name = "Input" },
+        { id = defines.inventory.assembling_machine_output, name = "Output" },
+        { id = defines.inventory.assembling_machine_modules, name = "Modules" }
+    },
+    ["lab"] =
+    {
+        { id = defines.inventory.lab_input, name = "Input" },
+        { id = defines.inventory.lab_modules, name = "Modules" },
+    },
+    ["beacon"] = { ["Modules"] = defines.inventory.beacon_modules },
+    ["ammo-turret"] = { ["Turret Ammo"] = defines.inventory.turret_ammo },
+    ["rocket-silo"] =
+    {
+        { id = defines.inventory.rocket_silo_rocket, name = "Silo Rocket" },
+        { id = defines.inventory.assembling_machine_input, name = "Input" },
+        { id = defines.inventory.rocket_silo_result, name = "Silo Result" },
+        { id = defines.inventory.assembling_machine_modules, name = "Modules" }
+    },
+}
 
-        index, value = next(tab, index)
-        top.index = index
+function util.entity.get_inventory_info(entity_type)
+    return entity_type_to_inventories_map[entity_type]
+end
 
-        if index == nil then
-            -- at the start of traversal, nil index denotes the table is empty
-            -- during traversal, nil index denotes the iteration has completed
-
-            table.remove(table_stack)
-
-            return nil, nil, true
-        end
-
-        local value_type = type(value)
-
-        if value_type == "table" and type(value.__self) ~= "userdata" and seen[value] == nil then
-
-            seen[value] = value
-            table.insert(table_stack, { table = value, index = nil })
-
-        end
-
-        if types_hashset == nil or types_hashset[value_type] ~= nil then
-            return index, value, true
-        else
-            return index, nil, true
-        end
-
+function util.entity.get_inventories(entity)
+    local ret = util.entity.get_inventory_info(entity.type)
+    for i = 0, #ret do
+        entry = ret[i]
+        entry.inventory = entity.get_inventory(entry.id)
     end
+    return ret
+end
 
-    types_hashset = { }
-    if types_whitelist ~= nil then
-        if type(types_whitelist) == "string" then
-            types_whitelist = { types_whitelist }
-        end
-        for _, val in pairs(types_whitelist) do
-            types_hashset[val] = val
-        end
+-- [Comment]
+-- Returns a string representation of `entity` which can be used as a table index.
+-- If fields position, surface and force are changed then the index is stale state.
+function util.entity.get_hash_string(entity)
+    return entity.position.x .. '_' .. entity.position.y .. '_' .. entity.surface.name .. '_' .. entity.type .. '_' .. entity.force.name
+end
+
+-- [Comment]
+-- Returns a collection of properties from `entity` which can be used to get that entity using util.entity.get_from_hash_object().
+-- If fields position, surface and force are changed then the index is stale state.
+function util.entity.get_hash(entity)
+    return { position = entity.position, surface = entity.surface.name, name = entity.name, force = entity.force.name }
+end
+
+-- [Comment]
+-- Returns an entity from a hash created by util.entity.get_hash()
+-- May return nil if the entity has died or 
+function util.entity.find(hash_object)
+    local entities = game.surfaces[hash_object.surface].find_entities_filtered(hash_object)
+    if #entities > 1 then
+        error("Multiple entities returned from util.entity.find_from_hash")
     end
-
-    local stack = { { table = table_, index = nil } }
-
-    -- stores nodes (tables) that have previously been traversed. Required for cyclic graphs
-    local seen = { table_ = table_ }
-    local value = nil
-    local continue = true
-
-    return function()
-
-        local index
-
-        while continue == true do
-            index, value, continue = iterator(stack, seen)
-
-            if value ~= nil then
-                return index, value
-            end
-
-        end
-    end
+    return entities[1]
 end

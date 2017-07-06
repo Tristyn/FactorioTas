@@ -41,6 +41,7 @@
     <None Include="FactorioTas\saves\v0.15 map exchange string.txt" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="FactorioTas\collections.lua" />
     <Compile Include="FactorioTas\control.lua" />
     <Compile Include="FactorioTas\data.lua" />
     <Compile Include="FactorioTas\gui.lua" />
