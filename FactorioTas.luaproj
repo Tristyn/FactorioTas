@@ -38,12 +38,15 @@
     <Content Include="FactorioTas\graphics\entity\waypoint.xcf" />
     <Content Include="FactorioTas\info.json" />
     <Content Include="FactorioTas\locale\en\base.cfg" />
+    <Content Include="todo.txt" />
     <None Include="FactorioTas\saves\v0.15 map exchange string.txt" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="FactorioTas\AggregateInventory.lua" />
     <Compile Include="FactorioTas\collections.lua" />
     <Compile Include="FactorioTas\control.lua" />
     <Compile Include="FactorioTas\data.lua" />
+    <Compile Include="FactorioTas\entities\ArrowController.lua" />
     <Compile Include="FactorioTas\gui.lua" />
     <Compile Include="FactorioTas\inspect.lua" />
     <Compile Include="FactorioTas\JSON.lua" />
@@ -65,6 +68,7 @@
     <Folder Include="FactorioTas\graphics\beam\" />
     <Folder Include="FactorioTas\locale\" />
     <Folder Include="FactorioTas\locale\en\" />
+    <Folder Include="FactorioTas\entities\" />
     <Folder Include="FactorioTas\saves\" />
     <Folder Include="FactorioTas\prototypes\" />
   </ItemGroup>

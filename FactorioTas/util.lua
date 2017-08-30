@@ -211,32 +211,27 @@ end
 -- Removes a SimpleItemStack `item_stack` from the inventories. May remove multiple stacks and remove from multiple inventories across the entity.
 -- Does not support removing durability or ammo count, but can be extended to support those cases.
 -- Returns the number of items actually removed.
-function util.remove_item_stack(entity, item_stack, inventories, include_player_cursor_stack)
+function util.remove_item_stack(entity, item_stack, inventories, player)
     local num_to_remove = item_stack.count
 
     for _, inventory_id in pairs(inventories) do
         local inventory = entity.get_inventory(inventory_id)
         
         if inventory ~= nil then
-
             local num_removed = inventory.remove( { name = item_stack.name, count = num_to_remove })
             num_to_remove = num_to_remove - num_removed
-            game.print(inventory_id .. ", num_removed = " .. num_removed)
             -- The specified number of items have been removed
             if num_to_remove == 0 then
                 return item_stack.count
             end
-        else
-            game.print("Nil!")
         end
 
     end
 
-    if include_cursor_stack == true then
+    if player ~= nil and player.cursor_stack.valid_for_read then
         
-
-        local num_removed = math.min(item_stack.count, num_to_remove)
-        item_stack.count = item_stack.count - num_removed
+        local num_removed = math.min(player.cursor_stack.count, num_to_remove)
+        item_stack.count = player.cursor_stack.count - num_removed
         num_to_remove = num_to_remove - num_removed
 
     end

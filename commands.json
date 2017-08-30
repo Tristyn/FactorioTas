@@ -1,14 +1,10 @@
 {
   "commands": {
-    "DeployToAppdata": {
+    "DeployToFactorio": {
       "fileName": "cmd.exe",
       "workingDirectory": ".",
-      "arguments": "/c DeployToAppdata.bat"
-    },
-    "DeployToDesktop": {
-      "fileName": "cmd.exe",
-      "workingDirectory": ".",
-      "arguments": "/c DeployToDesktop.bat"
+      "arguments": "/c deploy.bat"
     }
-  }, "-vs-binding":{"AfterBuild":["DeployToDesktop"]}
+  },
+  "-vs-binding": { "AfterBuild": [ "DeployToFactorio" ] }
 }

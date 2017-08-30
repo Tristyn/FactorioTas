@@ -8,13 +8,12 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Build", "Build", "{946B0C09-2BC7-4AA1-984F-64D35BC5FAA4}"
 	ProjectSection(SolutionItems) = preProject
 		commands.json = commands.json
-		DeployToAppdata.bat = DeployToAppdata.bat
-		DeployToDesktop.bat = DeployToDesktop.bat
+		deploy.bat = deploy.bat
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Lib", "Lib", "{D7451DE6-C7B0-4C51-8458-8E963C4B60AA}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "lib", "lib", "{D7451DE6-C7B0-4C51-8458-8E963C4B60AA}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Mods", "Mods", "{260730A5-A55F-475B-861B-3DCA543DA47B}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "factorio_0.15", "factorio_0.15", "{9B1CCC93-9924-4E0F-83EC-366F7DBD15C5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -31,6 +30,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{260730A5-A55F-475B-861B-3DCA543DA47B} = {D7451DE6-C7B0-4C51-8458-8E963C4B60AA}
+		{9B1CCC93-9924-4E0F-83EC-366F7DBD15C5} = {D7451DE6-C7B0-4C51-8458-8E963C4B60AA}
 	EndGlobalSection
 EndGlobal

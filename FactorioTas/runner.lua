@@ -158,7 +158,7 @@ function tas.runner.step_mining_state(runner, player)
     if runner.mining_completed_count < mine_order.count then
         -- mining_state makes the character mine under the cursor, but doesn't MOVE that cursor.
         -- use a different api call to move the cursor
-        character.mining_state = { mining = true, position = { 0, 0 } }
+        character.mining_state = { mining = true, position = mine_order.position }
         tas.runner.move_player_cursor(player, mine_order.position)
         return true
     else
@@ -261,7 +261,9 @@ function tas.runner.step_build_state(runner, player)
     if runner.in_progress_build_order == nil then
         -- find the next build order
         for build_order_index, build_order in ipairs(runner.active_build_orders) do
-            if tas.runner.can_reach_build_order(character, build_order) then
+            if tas.runner.can_reach_build_order(character, build_order)
+                and util.find_item_stack(character, constants.character_inventories, build_order.item_name) then
+
                 runner.in_progress_build_order = build_order
                 runner.in_progress_build_order_index = build_order_index
                 runner.build_order_progress = 1
@@ -404,7 +406,7 @@ function tas.runner.on_tick()
 
         if global.runner_state.num_ticks_to_step ~= nil and global.runner_state.num_ticks_to_step == 0 then
             global.runner_state.playback_state = tas.runner.playback_state.tick_4_prepare_to_attach_player
-        else    
+        else
             global.runner_state.playback_state = tas.runner.playback_state.tick_3_running
         end
 
@@ -415,7 +417,7 @@ function tas.runner.on_tick()
         -- decrement num_ticks_to_step and check if we should start to pause
         if global.runner_state.num_ticks_to_step ~= nil then
             global.runner_state.num_ticks_to_step = global.runner_state.num_ticks_to_step - 1
-            
+
             if global.runner_state.num_ticks_to_step <= 0 then
                 global.runner_state.playback_state = tas.runner.playback_state.tick_4_prepare_to_attach_player
             end

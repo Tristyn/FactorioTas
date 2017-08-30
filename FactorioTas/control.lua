@@ -1,4 +1,3 @@
-require "mod-gui"
 require "util"
 require "tas"
 require "gui"
@@ -54,12 +53,12 @@ script.on_event(defines.events.on_gui_checked_state_changed, function(event)
     local _, err = xpcall(tas.gui.on_check_changed, debug.traceback, event)
     if err then msg_all( { "TAS-err-specific", "on_check_changed", err }) end
 end )
-
+--[[
 script.on_event(defines.events.on_gui_selection_state_changed, function(event)
     local _, err = xpcall(tas.gui.on_dropdown_selection_changed, debug.traceback, event)
     if err then msg_all( { "TAS-err-specific", "on_dropdown_selection_changed", err }) end
 end )
-
+--]]
 script.on_event(defines.events.on_built_entity, function(event)
     local _, err = xpcall(tas.on_built_entity, debug.traceback, event)
     if err then msg_all( { "TAS-err-specific", "on_built_entity", err }) end

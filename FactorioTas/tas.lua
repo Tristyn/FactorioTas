@@ -581,13 +581,16 @@ end
 
 -- Creates a new build order table. ghost_entity can be nil.
 function tas.new_build_order_from_ghost_entity(ghost_entity)
-
-    local item_to_place_prototype = ghost_entity.ghost_prototype.items_to_place_this
+    
+    local build_order_item_name = nil
+    for name, entity in pairs(ghost_entity.ghost_prototype.items_to_place_this) do
+        build_order_item_name = name
+    end
     return
     {
         surface = ghost_entity.surface,
         position = ghost_entity.position,
-        item_name = item_to_place_prototype.name,
+        item_name = build_order_item_name,
         direction = ghost_entity.direction,
         entity = ghost_entity,
         entity_name = ghost_entity.ghost_name
@@ -853,7 +856,6 @@ end
 function tas.on_crafted_item(event)
     local item_stack = event.item_stack
     local player_index = event.player_index
-    local recipe = event.recipe
 
     if tas.runner.is_playing(player_index) then
         -- hook in replay crafting logic here?
@@ -867,6 +869,9 @@ function tas.on_crafted_item(event)
     -- both "iron-stick" with a count of 2 and "iron-axe" with a count of 1, assuming no "iron-sticks" are in the player's inventory)
     -- The trick to determine the top-level recipe is to set player.cheat_mode=true so that on_crafted_item fires exactly once when clicking the button to craft.
 
+    -- Only works in factorio 0.15+ -- recipe = event.recipe
+    local recipe = game.players[player_index].force.recipes[item_stack.name]
+
     if player_entity.cheat_mode == false then
         error("Can not determine crafted item because cheat-mode is not enabled for " .. player_entity.name .. ".")
     end
@@ -877,9 +882,8 @@ function tas.on_crafted_item(event)
     
     local player_data = tas.try_get_player_data(player_index)
     if player_data == nil then error("Could not create a craft order because no waypoint was selected.") end
+    util.remove_item_stack(player_entity.character, item_stack, constants.character_inventories, player_entity)
     tas.add_craft_order(player_data.waypoint, recipe, item_stack.count / recipe.products[1].amount)
-    game.print(item_stack.count)
-    game.print(util.remove_item_stack(player_entity, item_stack, constants.character_inventories, true))
     tas.gui.refresh(player_index)
 
 end
@@ -905,7 +909,7 @@ function tas.on_left_click(event)
 
     local entity = player.selected
     local entity_name = entity.name
-
+    
     if entity_name == "tas-waypoint" then
         tas.on_clicked_waypoint(player_index, entity)
     elseif entity_name == "entity-ghost" then
