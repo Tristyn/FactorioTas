@@ -223,8 +223,9 @@ function tas.gui.build_inventory_names_list_box(container_element, inventory_lis
 
             local element = event.element
             if element.caption == "=" then
-                for _, list_box_entry_frame_name in pairs(list_box.children_names)
-                    list_box[list_box_entry_frame_name].
+                for _, list_box_entry_frame_name in pairs(list_box.children_names) do
+                    -- TODO:  UNFINISHED 
+                    --list_box[list_box_entry_frame_name].
                 end
                 element.caption = "*"
             elseif element.caption == "*" then

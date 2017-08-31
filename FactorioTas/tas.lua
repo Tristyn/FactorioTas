@@ -29,6 +29,8 @@ function tas.on_player_created(event)
     tas.gui.init_player(player_index)
 end
 
+ArrowController = require("entities.ArrowController")
+
 -- Creates and returns a static text entity that never despawns.
 -- If color is nil, the text will be white
 function tas.create_static_text(surface, position, content, color)
@@ -46,7 +48,9 @@ function tas.create_static_text(surface, position, content, color)
     return text
 end
 
--- Updates the position of the arrow. 
+--[Comment]
+-- Creates a new arrow facade instance that displays a beam onscreen between two entities.
+-- Other methods can control its lifetime.
 function tas.create_arrow(source_entity, target_entity)
 
     -- Note: The arrow is drawn using a beam entity, which requries the source and target to have health.
@@ -58,9 +62,9 @@ function tas.create_arrow(source_entity, target_entity)
     {
         source = source_entity,
         target = target_entity,
-        valid = true
+        disposed = false
     }
-
+    
     local arrow_builder = {
         name = "tas-arrow",
         position = { 0, 0 },
@@ -94,26 +98,33 @@ function tas.create_arrow(source_entity, target_entity)
     return arrow_facade
 end
 
+-- [Comment]
+-- Ensures that the arrows position matches that of the source and target entities.
+-- Returns true if the beam still exists in the game world, otherwise false.
 function tas.update_arrow(arrow_facade)
 
-    if arrow_facade.valid == false then
+    if arrow_facade.disposed == true then
         error("Attempted to update an arrow that has been destroyed. Throwing to warn of a resource leak")
     end
 
     -- update the proxy entities positions so that the beam entity draws in the correct position
 
     if arrow_facade.source_proxy ~= nil and arrow_facade.source_proxy.valid == true and arrow_facade.source.valid == true then
-        arrow_facade.source_proxy.position = arrow_facade.source.position
+        arrow_facade.source_proxy.teleport(arrow_facade.source.position)
     end
 
-    if arrow_facade.target_proxy ~= nil and arrow_facade.target_proxy.valid == true and arrow_facade.source.valid == true then
-        arrow_facade.target_proxy.position = arrow_facade.target.position
+    if arrow_facade.target_proxy ~= nil and arrow_facade.target_proxy.valid == true and arrow_facade.target.valid == true then
+        arrow_facade.target_proxy.teleport(arrow_facade.target.position)
     end
 
 end
 
+-- [Comment]
+-- Destroys any internal entities and renders the object useless.
+-- Subsequent calls to other instance methods will result in an error.
+-- instance field disposed will return true
 function tas.destroy_arrow(arrow_facade)
-    arrow_facade.valid = false
+    arrow_facade.disposed = true
 
     if arrow_facade.source_proxy ~= nil and arrow_facade.source_proxy.valid == true then
         arrow_facade.source_proxy.destroy()
@@ -128,12 +139,6 @@ function tas.destroy_arrow(arrow_facade)
         arrow_facade.beam.destroy()
     end
 
-end
-
-function tas.insert_arrow_into_auto_update_respository(arrow_facade)
-    if arrow_facade == nil then error() end
-
-    global.arrow_auto_update_repository[arrow_facade] = arrow_facade
 end
 
 -- [Comment]
@@ -153,11 +158,12 @@ function tas.ensure_cheat_mode_enabled(player)
     end
 
     if player_entity.cheat_mode == false then
-        player_entity.print( "[TAS] Editor: Enabling cheat mode." )
+        player_entity.print("[TAS] Editor: Enabling cheat mode.")
         player_entity.cheat_mode = true
     end
 end
 
+-- [Comment]
 -- Creates a new waypoint table. waypoint_entity can be nil.
 function tas.new_waypoint(surface, position, waypoint_index, is_visible_in_game, waypoint_entity)
     local text_entity
@@ -581,7 +587,7 @@ end
 
 -- Creates a new build order table. ghost_entity can be nil.
 function tas.new_build_order_from_ghost_entity(ghost_entity)
-    
+
     local build_order_item_name = nil
     for name, entity in pairs(ghost_entity.ghost_prototype.items_to_place_this) do
         build_order_item_name = name
@@ -879,7 +885,7 @@ function tas.on_crafted_item(event)
     if #recipe.products ~= 1 then
         error("No support for crafting recipes with zero or multiple products.")
     end
-    
+
     local player_data = tas.try_get_player_data(player_index)
     if player_data == nil then error("Could not create a craft order because no waypoint was selected.") end
     util.remove_item_stack(player_entity.character, item_stack, constants.character_inventories, player_entity)
@@ -909,7 +915,7 @@ function tas.on_left_click(event)
 
     local entity = player.selected
     local entity_name = entity.name
-    
+
     if entity_name == "tas-waypoint" then
         tas.on_clicked_waypoint(player_index, entity)
     elseif entity_name == "entity-ghost" then
@@ -920,6 +926,7 @@ function tas.on_left_click(event)
 end
 
 function tas.update_player_hover(player, player_entity)
+    -- delete arrow collection
     for _, arrow in ipairs(player.hover_arrows) do
         tas.destroy_arrow(arrow)
     end
@@ -1023,16 +1030,26 @@ function tas.update_arrow_repository()
     local arrows_to_remove = { }
 
     for _, arrow in pairs(global.arrow_auto_update_repository) do
-        if arrow.valid == false then
+        if arrow.disposed == true then
             table.insert(arrows_to_remove, arrow)
         else
-            -- tas.update_arrow(arrow)
+            local arrow_visible = tas.update_arrow(arrow)
+            if arrow_visible == false then
+                tas.destroy_arrow(arrow)
+                return table.insert(arrows_to_remove, arrow)
+            end
         end
     end
 
     for _, arrow in ipairs(arrows_to_remove) do
         global.arrow_auto_update_repository[arrow] = nil
     end
+end
+
+function tas.insert_arrow_into_auto_update_respository(arrow_facade)
+    if arrow_facade == nil then error() end
+
+    global.arrow_auto_update_repository[arrow_facade] = arrow_facade
 end
 
 function tas.update_debug_entity_count()

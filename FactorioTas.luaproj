@@ -46,10 +46,10 @@
     <Compile Include="FactorioTas\collections.lua" />
     <Compile Include="FactorioTas\control.lua" />
     <Compile Include="FactorioTas\data.lua" />
-    <Compile Include="FactorioTas\entities\ArrowController.lua" />
     <Compile Include="FactorioTas\gui.lua" />
     <Compile Include="FactorioTas\inspect.lua" />
     <Compile Include="FactorioTas\JSON.lua" />
+    <Compile Include="FactorioTas\PlayerView.lua" />
     <Compile Include="FactorioTas\prototypes\beam.lua" />
     <Compile Include="FactorioTas\prototypes\entity.lua" />
     <Compile Include="FactorioTas\prototypes\hotkey.lua" />
@@ -68,7 +68,6 @@
     <Folder Include="FactorioTas\graphics\beam\" />
     <Folder Include="FactorioTas\locale\" />
     <Folder Include="FactorioTas\locale\en\" />
-    <Folder Include="FactorioTas\entities\" />
     <Folder Include="FactorioTas\saves\" />
     <Folder Include="FactorioTas\prototypes\" />
   </ItemGroup>

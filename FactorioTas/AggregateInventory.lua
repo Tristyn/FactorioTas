@@ -1,6 +1,7 @@
-AggregateInventory = { }
+local AggregateInventory = { }
+AggregateInventory.__index = { }
 
-function AggregateInventory:create(inventory_collection)
+function AggregateInventory:new(inventory_collection)
     local aggregate_inventory = { }
     aggregate_inventory.inventories = inventory_collection
     aggregate_inventory.__index = AggregateInventory
@@ -10,3 +11,5 @@ end
 function AggregateInventory:_index(index)
     return self.inventories[index]
 end
+
+return AggregateInventory
