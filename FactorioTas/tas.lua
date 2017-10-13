@@ -1,3 +1,5 @@
+local BuildOrder = require("BuildOrder")
+
 tas = { }
 
 function tas.log(level, message)
@@ -28,8 +30,6 @@ function tas.on_player_created(event)
 
     tas.gui.init_player(player_index)
 end
-
-ArrowController = require("entities.ArrowController")
 
 -- Creates and returns a static text entity that never despawns.
 -- If color is nil, the text will be white
@@ -587,20 +587,7 @@ end
 
 -- Creates a new build order table. ghost_entity can be nil.
 function tas.new_build_order_from_ghost_entity(ghost_entity)
-
-    local build_order_item_name = nil
-    for name, entity in pairs(ghost_entity.ghost_prototype.items_to_place_this) do
-        build_order_item_name = name
-    end
-    return
-    {
-        surface = ghost_entity.surface,
-        position = ghost_entity.position,
-        item_name = build_order_item_name,
-        direction = ghost_entity.direction,
-        entity = ghost_entity,
-        entity_name = ghost_entity.ghost_name
-    }
+    return BuildOrder.new_from_ghost_entity(ghost_entity)
 end
 
 function tas.new_mine_order(entity, num_to_mine)

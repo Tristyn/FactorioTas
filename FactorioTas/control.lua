@@ -17,13 +17,40 @@ function msg_all(message)
     end
 end
 
--- error if the argument evaluates to false or nil
+--[Comment]
+-- Error if the argument evaluates to false or nil
 function fail_if_missing(var, msg)
     if not var then
         if msg then
             error(msg, 3)
         else
             error("Missing value", 3)
+        end
+    end
+    return false
+end
+
+--[Comment]
+-- Returns true if the entity currently exists in the game world. (not null and valid == true)
+function is_valid(entity)
+    if not entity then
+        return false
+    end
+
+    return entity.valid
+end
+
+--[Comment]
+-- Error if the argument evaluates to false or nil,
+-- or if the `valid` property of the argument is not true.
+function fail_if_invalid(entity, msg)
+    if not fail_if_missing(entity, msg) then
+        if entity.valid ~= true then
+            if msg then
+                error(msg, 3)
+            else
+                error("Entity is invalid.", 3)
+            end
         end
     end
     return false

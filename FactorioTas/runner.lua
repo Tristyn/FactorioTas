@@ -133,7 +133,7 @@ function tas.runner.step_mining_state(runner, player)
     local character = runner.character
 
     if runner.in_progress_mine_order == nil then
-        -- find the next build order
+        -- find the next mine order
         for mine_order_index, mine_order in ipairs(runner.active_mine_orders) do
             if tas.runner.can_reach_mine_order(character, mine_order) then
                 runner.in_progress_mine_order = mine_order
@@ -208,28 +208,7 @@ function tas.runner.move_items(target_stack, source_stack, character, overflow_i
 end
 
 function tas.runner.can_reach_build_order(character, build_order)
-    local hittest_entity = build_order.entity
-
-    if hittest_entity == nil then
-        -- Create an ephemeral entity to run a hit-test against.
-        -- Ghost entities flashing into and out of existance may mess with construction robots, not sure.
-        hittest_entity = build_order.surface.create_entity( { name = build_order.entity_name, position = build_order.position, direction = build_order.direction })
-    end
-
-    -- The function character.can_reach_entity() is off limits because
-    -- it will always return true for entities such as ghost.
-
-    local selection_box_world_space = math.rectangle.translate(hittest_entity.prototype.selection_box, hittest_entity.position)
-    local distance = math.distance_rectangle_to_point(selection_box_world_space, character.position)
-    local can_reach = distance < util.get_build_distance(character) -0.5
-    -- Include a 0.5 margin of error because this isn't the exact reach distance formula.
-
-    if build_order.entity == nil then
-        -- destroy the ephemeral entity that was created earlier in the function
-        hittest_entity.destroy()
-    end
-
-    return can_reach
+    return build_order:can_reach(character)
 end
 
 function tas.runner.try_build_object(player, build_order)
