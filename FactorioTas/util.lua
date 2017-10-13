@@ -244,6 +244,7 @@ function util.remove_item_stack(entity, item_stack, inventories, player)
     return item_stack.count - num_to_remove
 end
 
+--[Comment]
 -- Inserts the item into the first empty slot of the the inventories. Does not reduce the 'count' property of the item_stack parameter.
 -- Parameter inventories is a collection of defines.inventory, see http://lua-api.factorio.com/latest/defines.html#defines.inventory.
 -- Parameter items is SimpleItemStack.
@@ -358,27 +359,48 @@ function util.entity.get_inventories(entity)
     return ret
 end
 
--- [Comment]
+--[Comment]
 -- Returns a string representation of `entity` which can be used as a table index.
 -- If fields position, surface and force are changed then the index is stale state.
 function util.entity.get_hash_string(entity)
     return entity.position.x .. '_' .. entity.position.y .. '_' .. entity.surface.name .. '_' .. entity.type .. '_' .. entity.force.name
 end
 
--- [Comment]
+--[Comment]
 -- Returns a collection of properties from `entity` which can be used to get that entity using util.entity.get_from_hash_object().
 -- If fields position, surface and force are changed then the index is stale state.
 function util.entity.get_hash(entity)
     return { position = entity.position, surface = entity.surface.name, name = entity.name, force = entity.force.name }
 end
 
--- [Comment]
+--[Comment]
 -- Returns an entity from a hash created by util.entity.get_hash()
--- May return nil if the entity has died or 
+-- May return nil if the entity was not found.
 function util.entity.find(hash_object)
     local entities = game.surfaces[hash_object.surface].find_entities_filtered(hash_object)
     if #entities > 1 then
         error("Multiple entities returned from util.entity.find_from_hash")
     end
     return entities[1]
+end
+
+--[Comment]
+-- util.assign_table(target_table, source_table_1, source_table_2..)
+-- The util.assign_table() method is used to copy the values of all enumerable properties from one or more source tables to a target table.
+-- Returns the target_table.
+-- target_table must be a table and not nil.
+function util.assign_table(target_table, ...)
+    fail_if_missing(target_table)
+    fail_if_missing(arg)
+    
+    for i=1, #arg do
+        local source_table = arg[i]
+        for source_key,source_value in pairs(source_table) do
+            
+            target_table[source_key] = source_value
+
+        end
+    end
+
+    return target_table
 end
