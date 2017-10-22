@@ -1,20 +1,20 @@
-local WaypointLookup = { }
+local WaypointIndexer = { }
 
-function WaypointLookup.set_metatable(instance)
-	setmetatable(instance, {__index = WaypointLookup})
+function WaypointIndexer.set_metatable(instance)
+	setmetatable(instance, {__index = WaypointIndexer})
 end
 
-function WaypointLookup.new()
+function WaypointIndexer.new()
 	local new = {
 		_hash_table = { }
 	}
 
-	WaypointLookup.set_metatable(new)
+	WaypointIndexer.set_metatable(new)
 
 	return new
 end
 
-function WaypointLookup:add(sequence, sequence_index, waypoint_index)
+function WaypointIndexer:add(sequence, sequence_index, waypoint_index)
 	fail_if_missing(sequence)
 	fail_if_missing(sequence_index)
 	fail_if_missing(waypoint_index)
@@ -38,7 +38,7 @@ function WaypointLookup:add(sequence, sequence_index, waypoint_index)
 	self._hash_table[table_key] = table_value
 end
 
-function WaypointLookup:find_from_entity(waypoint_entity)
+function WaypointIndexer:find_from_entity(waypoint_entity)
 	fail_if_invalid(waypoint_entity)
 
 	local table_key = util.entity.get_hash_string(waypoint_entity)
@@ -46,7 +46,7 @@ function WaypointLookup:find_from_entity(waypoint_entity)
 	return self._hash_table[table_key]
 end
 
-function WaypointLookup:update_sequence_index(sequence, new_sequence_index)
+function WaypointIndexer:update_sequence_index(sequence, new_sequence_index)
 	fail_if_missing(sequence)
 	fail_if_missing(new_sequence_index)
 
@@ -65,7 +65,7 @@ function WaypointLookup:update_sequence_index(sequence, new_sequence_index)
 	end
 end
 
-function WaypointLookup:update_waypoint_index(waypoint, new_waypoint_index)
+function WaypointIndexer:update_waypoint_index(waypoint, new_waypoint_index)
 	fail_if_missing(waypoint)
 	fail_if_missing(new_waypoint_index)
 
@@ -80,7 +80,7 @@ function WaypointLookup:update_waypoint_index(waypoint, new_waypoint_index)
 	entry.waypoint_index = new_waypoint_index
 end
 
-function WaypointLookup:update_waypoint_entity(old_waypoint_entity, new_waypoint_entity)
+function WaypointIndexer:update_waypoint_entity(old_waypoint_entity, new_waypoint_entity)
 	fail_if_invalid(old_waypoint_entity)
 	fail_if_invalid(new_waypoint_entity)
 
@@ -97,7 +97,7 @@ end
 
 --[Comment]
 -- Removes the entry using the waypoint_entity. Returns true if the entry is found, else false.
-function WaypointLookup:remove(waypoint_entity)
+function WaypointIndexer:remove(waypoint_entity)
 	fail_if_invalid(waypoint_entity)
 
 	local table_key = util.entity.get_hash_string(waypoint_entity)
@@ -107,4 +107,4 @@ end
 
 
 
-return WaypointLookup
+return WaypointIndexer

@@ -1,6 +1,6 @@
 local BuildOrder = require("BuildOrder")
 local Waypoint = require("Waypoint")
-local WaypointLookup = require("WaypointLookup")
+local WaypointIndexer = require("WaypointIndexer")
 
 tas = { }
 
@@ -14,11 +14,11 @@ function tas.init_globals()
     global.sequences = { }
     global.players = { }
     global.arrow_auto_update_repository = { }
-    global.waypoint_lookup = WaypointLookup.new()
+    global.waypoint_lookup = WaypointIndexer.new()
 end
 
 function tas.set_metatable()
-    WaypointLookup.set_metatable(global.waypoint_lookup)
+    WaypointIndexer.set_metatable(global.waypoint_lookup)
 end
 
 function tas.on_player_created(event)
