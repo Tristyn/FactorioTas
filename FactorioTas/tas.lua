@@ -1,4 +1,6 @@
 local BuildOrder = require("BuildOrder")
+local Waypoint = require("Waypoint")
+local WaypointLookup = require("WaypointLookup")
 
 tas = { }
 
@@ -8,11 +10,15 @@ function tas.log(level, message)
     end
 end
 
-local init = false
 function tas.init_globals()
     global.sequences = { }
     global.players = { }
     global.arrow_auto_update_repository = { }
+    global.waypoint_lookup = WaypointLookup.new()
+end
+
+function tas.set_metatable()
+    WaypointLookup.set_metatable(global.waypoint_lookup)
 end
 
 function tas.on_player_created(event)
@@ -163,31 +169,6 @@ function tas.ensure_cheat_mode_enabled(player)
     end
 end
 
--- [Comment]
--- Creates a new waypoint table. waypoint_entity can be nil.
-function tas.new_waypoint(surface, position, waypoint_index, is_visible_in_game, waypoint_entity)
-    local text_entity
-    if is_visible_in_game == true then
-        if waypoint_entity == nil or waypoint_entity.valid == false then
-            waypoint_entity = surface.create_entity { name = "tas-waypoint", position = position }
-        end
-
-        text_entity = tas.create_static_text(surface, position, util.integer_to_string(waypoint_index))
-    end
-
-    return
-    {
-        surface = surface,
-        position = position,
-        entity = waypoint_entity,
-        text_entity = text_entity,
-        build_orders = { },
-        mine_orders = { },
-        craft_orders = { },
-        item_transfer_orders = { }
-    }
-end
-
 -- creates a new sequence and returns it's index in the sequence table
 function tas.new_sequence(add_spawn_waypoint, add_initial_crafting_queue)
     local sequence_index = #global.sequences + 1
@@ -196,19 +177,24 @@ function tas.new_sequence(add_spawn_waypoint, add_initial_crafting_queue)
     local sequence = {
         waypoints = { }
     }
+    
+    global.sequences[sequence_index] = sequence
 
     if add_spawn_waypoint == true then
-        local surface = game.surfaces["nauvis"]
         local origin = { x = 0, y = 0 }
 
-        sequence.waypoints[1] = tas.new_waypoint(surface, origin, 1, true)
+        local new_waypoint = Waypoint.new("nauvis", origin)
+        if new_waypoint == nil then
+            game.print("Could not create a waypoint at spawn because one already exists there.")
+            return nil
+        end
+        sequence.waypoints[1] = new_waypoint
+        global.waypoint_lookup:add(sequence, sequence_index, 1)
 
         if add_initial_crafting_queue == true then
             tas.add_craft_order(sequence.waypoints[1], "iron-axe", 1)
         end
     end
-
-    global.sequences[sequence_index] = sequence
 
     local final_waypoint_index = #sequence.waypoints
     if final_waypoint_index == 0 then
@@ -257,6 +243,16 @@ function tas.realign_sequence_indexes(start_index, shift)
             tas.select_waypoint(player_index, new_selected_waypoint, new_selected_sequence)
         end
     end
+
+    local sequences = global.sequences
+    local waypoint_lookup = global.waypoint_lookup
+    
+    -- realign entries in the waypoint lookup object, skip entities < start_index
+    for i = start_index, #sequences do
+        local sequence = sequences[i]
+        
+        waypoint_lookup:update_sequence_index(sequence, i)
+    end
 end
 
 function tas.destoy_sequence(sequence_index)
@@ -295,19 +291,7 @@ function tas.select_waypoints_in_sequences()
 end
 
 function tas.find_waypoint_from_entity(waypoint_entity)
-    -- iterate all waypoints of all sequences to find a match
-    for sequence_index, sequence in ipairs(global.sequences) do
-
-        local waypoint_index = tas.scan_table_for_value(sequence.waypoints, function(waypoint) return waypoint.entity end, waypoint_entity)
-        if waypoint_index ~= nil then
-            return {
-                sequence_index = sequence_index,
-                sequence = sequence,
-                waypoint_index = waypoint_index,
-                waypoint = sequence.waypoints[waypoint_index]
-            }
-        end
-    end
+    return global.waypoint_lookup:find_from_entity(waypoint_entity)
 end
 
 -- Returns nil if the player hasn't selected a waypoint
@@ -466,7 +450,7 @@ function tas.select_waypoint(player_index, selected_sequence_waypoint_index, sel
 
         -- Create the 'highlight' entity
         local waypoint = global.sequences[player.selected_sequence_index].waypoints[player.selected_sequence_waypoint_index]
-        local new_highlight = waypoint.surface.create_entity { name = "tas-waypoint-selected", position = waypoint.position }
+        local new_highlight = game.surfaces[waypoint.surface_name].create_entity { name = "tas-waypoint-selected", position = waypoint.position }
         player.selected_waypoint_highlight_entity = new_highlight
 
         -- Show the waypoint gui (or hide it if no waypoint is selected)
@@ -477,19 +461,21 @@ end
 
 function tas.move_waypoint(sequence_index, waypoint_index, new_waypoint_entity)
     local waypoint = global.sequences[sequence_index].waypoints[waypoint_index]
+    local old_waypoint_entity = waypoint:get_entity()
+
+    fail_if_missing(old_waypoint_entity)
+
+    -- Update the indexer
+    global.waypoint_lookup:update_waypoint_entity(old_waypoint_entity, new_waypoint_entity)
 
     -- clean up entities
-    if waypoint.entity ~= nil and waypoint.entity.valid == true then
-        waypoint.entity.destroy()
-    end
-    waypoint.entity = new_waypoint_entity
-
-    if waypoint.text_entity ~= nil and waypoint.text_entity.valid == true then
-        waypoint.text_entity.destroy()
+    local old_waypoint_entity = waypoint:get_entity()
+    if old_waypoint_entity ~= nil  then
+        old_waypoint_entity.destroy()
     end
 
-    waypoint.text_entity = tas.create_static_text(new_waypoint_entity.surface, new_waypoint_entity.position, util.integer_to_string(waypoint_index))
     waypoint.position = new_waypoint_entity.position
+    waypoint.surface_name = new_waypoint_entity.surface.name
 
     -- update waypoint highlights
     for _, player in pairs(global.players) do
@@ -524,14 +510,13 @@ function tas.realign_waypoint_indexes(sequence_index, start_index, shift)
     end
 
     local waypoints = global.sequences[sequence_index].waypoints
+    local waypoint_lookup = global.waypoint_lookup
 
-    -- realign waypoint entity text, skip entities < start_index
+    -- realign entries in the waypoint lookup object, skip entities < start_index
     for i = start_index, #waypoints do
         local waypoint = waypoints[i]
-        if waypoint.text_entity ~= nil then
-            waypoint.text_entity.destroy()
-            waypoint.text_entity = tas.create_static_text(waypoint.surface, waypoint.position, util.integer_to_string(i))
-        end
+
+        waypoint_lookup:update_waypoint_index(waypoint, i)
     end
 
 end
@@ -558,12 +543,13 @@ function tas.insert_waypoint(waypoint_entity, player_index)
     end
     --]]
 
-    local waypoint = tas.new_waypoint(waypoint_entity.surface, waypoint_entity.position, waypoint_insert_index, true, waypoint_entity)
+    local waypoint = Waypoint.new(waypoint_entity.surface.name, waypoint_entity.position, true)
 
     table.insert(sequence.waypoints, waypoint_insert_index, waypoint)
+    global.waypoint_lookup:add(sequence, sequence_index, waypoint_insert_index)
 
     tas.realign_waypoint_indexes(sequence_index, waypoint_insert_index, 1)
-
+    
     tas.select_waypoint(player_index, waypoint_insert_index)
 end
 
@@ -583,6 +569,7 @@ function tas.on_built_waypoint(created_entity, player_index)
     else
         tas.insert_waypoint(created_entity, player_index)
     end
+    
 end
 
 -- Creates a new build order table. ghost_entity can be nil.
@@ -685,20 +672,17 @@ function tas.on_pre_removing_waypoint(waypoint_entity)
         msg_all( { "TAS-err-generic", "Could not locate data for waypoint entity. This should never happen. Stacktrace: " .. debug.traceback() })
         return
     end
-
+    
     local waypoint = find_result.waypoint
-
-    -- Clean up waypoint data entry and floating text entity
-    if waypoint.text_entity ~= nil and waypoint.text_entity.valid == true then
-        waypoint.text_entity.destroy()
-    end
 
     -- Remove the waypoint and shift all others to the left
     table.remove(find_result.sequence.waypoints, find_result.waypoint_index)
+    global.waypoint_lookup:remove(waypoint_entity)
 
     -- All waypoint elements after waypoint_index have been shifted left.
     -- Any stored waypoint indexes > waypoint_index must be realigned.
     tas.realign_waypoint_indexes(find_result.sequence_index, find_result.waypoint_index, -1)
+    
 end
 
 function tas.on_pre_removing_ghost(ghost_entity)
@@ -714,7 +698,7 @@ function tas.on_pre_mined_entity(event)
     local robot = event.robot
     local entity = event.entity
 
-    if player_index ~= nil then
+    if player_index ~= nil and tas.runner.runner_exists() then
         tas.runner.on_pre_mined_entity(player_index, entity)
     end
 
@@ -728,6 +712,7 @@ function tas.on_pre_mined_entity(event)
             tas.on_pre_mined_resource(player_index, entity)
         end
     end
+
 end
 
 -- recipe may be a string or LuaRecipe.

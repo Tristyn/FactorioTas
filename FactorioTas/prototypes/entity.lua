@@ -7,7 +7,10 @@ data:extend(
         icon = "__FactorioTas__/graphics/entity/waypoint.png",
         -- subgroup = "grass",
         order = "a[tas]",
-        -- collision_box = {{-1.1, -1.1}, {1.1, 1.1}},
+
+        -- Some sort of collision box is required to use surface.find_entity(name,position)
+        --collision_box = {{-0.05, -0.05}, {0.05, 0.05}},
+        --collision_mask = { "layer-15" },
         collision_mask = { },
         selection_box = { { - 0.4, - 0.4 }, { 0.4, 0.4 } },
         -- drawing_box = { { - 0.5, - 0.5 }, { 0.5, 0.5 } },

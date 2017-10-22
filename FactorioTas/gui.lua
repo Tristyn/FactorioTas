@@ -345,7 +345,7 @@ function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index
     if #waypoint.craft_orders > 0 then
         gui.waypoint.add { type = "label", caption = "crafting queue" }
         local craft_orders_as_inventory = tas.gui.craft_orders_to_inventory(waypoint.craft_orders)
-        tas.gui.build_inventory_grid_control(gui.waypoint, craft_orders_as_inventory, 10, "recipe/", function(event)
+        tas.gui.build_inventory_grid_control(gui.waypoint, craft_orders_as_inventory, "recipe/", function(event)
             tas.destroy_craft_order(waypoint.craft_orders[event.item_stack_index])
             tas.gui.unregister_click_callbacks(event.click_event.element)
             tas.gui.refresh(event.click_event.player_index)
@@ -357,7 +357,7 @@ function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index
         for i, order in ipairs(waypoint.item_transfer_orders) do
 
             gui.waypoint.add { type = "label", caption = { "TAS-item-transfer-order-description", order.container_entity.name, order.container_entity.position.x, order.container_entity.position.y } }
-            tas.gui.build_inventory_grid_control(gui.waypoint, { order.item_stack }, 10, "item/", nil)
+            tas.gui.build_inventory_grid_control(gui.waypoint, { order.item_stack }, "item/", nil)
 
         end
 

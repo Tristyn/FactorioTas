@@ -384,6 +384,16 @@ function util.entity.find(hash_object)
     return entities[1]
 end
 
+function util.find_entity(surface_name, entity_name, position)
+    local surface = game.surfaces[surface_name]
+    if surface == nil then return nil end
+    -- find_entities_filtered works better than find_entity
+    -- because it doesn't require a collision box
+    local entities = surface.find_entities_filtered{name = entity_name, area = {{position.x - 0.05, position.y - 0.05}, {position.x + 0.05, position.y + 0.05}}}
+    if #entities == 0 then return nil end
+    return entities[1]
+end
+
 --[Comment]
 -- util.assign_table(target_table, source_table_1, source_table_2..)
 -- The util.assign_table() method is used to copy the values of all enumerable properties from one or more source tables to a target table.

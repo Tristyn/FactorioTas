@@ -66,6 +66,13 @@ script.on_init( function()
     if err then msg_all( { "TAS-err-specific", "on_init", err }) end
 end )
 
+script.on_load( function()
+    local _, err = xpcall( function()
+        tas.set_metatable()
+    end , debug.traceback)
+    if err then msg_all( { "TAS-err-specific", "on_load", err }) end
+end)
+
 script.on_event(defines.events.on_player_created, function(event)
     local _, err = xpcall(tas.on_player_created, debug.traceback, event)
     if err then msg_all( { "TAS-err-specific", "on_player_created", err }) end

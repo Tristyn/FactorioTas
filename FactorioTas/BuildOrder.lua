@@ -1,5 +1,8 @@
 local BuildOrder = { }
-local MetaIndex = { }
+
+function BuildOrder.set_metatable(instance)
+    setmetatable(instance, {__index = BuildOrder})
+end
 
 --[Comment]
 -- Creates a new build order object that is tied to a ghost entity.
@@ -13,7 +16,6 @@ function BuildOrder.new_from_ghost_entity(ghost_entity)
     end
     local new =
     {
-        surface = ghost_entity.surface,
         surface_name = ghost_entity.surface.name,
         position = ghost_entity.position,
         item_name = build_order_item_name,
@@ -22,12 +24,12 @@ function BuildOrder.new_from_ghost_entity(ghost_entity)
         entity_name = ghost_entity.ghost_name
     }
 
-    setmetatable(new, {__index = MetaIndex })
+    BuildOrder.set_metatable(new)
 
     return new
 end
 
-function MetaIndex:can_reach(character)
+function BuildOrder:can_reach(character)
     fail_if_invalid(character) 
 
     local surface = self:try_get_surface()
@@ -44,7 +46,7 @@ function MetaIndex:can_reach(character)
         -- Ghost entities flashing into and out of existance may mess with construction robots or other mods, not sure.
         -- A fix for this is to create dummy prototypes with matching hitboxes for every entity in the game,
         -- or implement the raw hit test code from factorio but using simple math instead of entities.  
-        hittest_entity = surface.create_entity( { name = build_order.entity_name, position = build_order.position, direction = build_order.direction })
+        hittest_entity = surface.create_entity( { name = self.entity_name, position = self.position, direction = self.direction })
         is_hittest_entity_ephemeral = true
     end
     
@@ -66,7 +68,7 @@ end
 
 --[Comment]
 -- Returns a valid handle of the surface of this build order, or nil.
-function MetaIndex:try_get_surface()
+function BuildOrder:try_get_surface()
     if is_valid(self.surface) then
         return self.surface
     end
@@ -75,6 +77,18 @@ function MetaIndex:try_get_surface()
     if is_valid(self.surface) then
         return self.surface
     end
+end
+
+function BuildOrder:try_build_object(player)
+    -- build_order.surface.create_entity( { name = build_order.entity_name, position = build_order.position, direction = build_order.direction })
+    -- in the future, calculate the players zoom
+    tas.runner.move_player_cursor(player, build_order.position)
+    local cursor = "empty";
+    if player.cursor_stack.valid_for_read then
+        cursor = player.cursor_stack.name
+    end
+
+    return player.build_from_cursor(click_position)
 end
 
 return BuildOrder

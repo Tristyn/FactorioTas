@@ -1,3 +1,5 @@
+local CharacterController = require("CharacterController")
+
 tas.runner =
 {
     playback_state =
@@ -31,15 +33,9 @@ function tas.runner.new_runner(sequence)
         return nil
     end
 
-    local character = sequence_start.surface.create_entity { name = "player", position = sequence_start.position, force = "player" }
+    local character_controller = CharacterController.new()
 
-    -- insert items that are given at spawn
-    local quickbar = character.get_inventory(defines.inventory.player_quickbar)
-    quickbar.insert( { name = "burner-mining-drill", count = 1 })
-    quickbar.insert( { name = "stone-furnace", count = 1 })
-    character.get_inventory(defines.inventory.player_main).insert( { name = "iron-plate", count = 8 })
-    character.get_inventory(defines.inventory.player_guns).insert( { name = "pistol", count = 1 })
-    character.get_inventory(defines.inventory.player_ammo).insert( { name = "firearm-magazine", count = 10 })
+    character_controller.create_character(game.surfaces[sequence_start.surface_name])
 
     global.runner = {
         sequence = sequence,
@@ -47,7 +43,8 @@ function tas.runner.new_runner(sequence)
         active_build_orders = { },
         active_mine_orders = { },
         mining_finished_this_tick = false,
-        character = character,
+        character = character_controller.get_character(),
+        character_controller = character_controller
     }
 
     tas.runner.activate_build_orders_in_waypoint(global.runner, 1)
@@ -286,8 +283,9 @@ function tas.runner.step_build_state(runner, player)
 
         tas.runner.move_items(player.cursor_stack, item_to_place, character, constants.character_inventories)
 
+        local surface = game.surfaces[runner.in_progress_build_order.surface_name]
         -- Check for collisions with terrain or other entities.
-        if runner.in_progress_build_order.surface.can_place_entity( {
+        if surface.can_place_entity( {
                 name = runner.in_progress_build_order.entity_name,
                 position = runner.in_progress_build_order.position,
                 direction = runner.in_progress_build_order.direction,
