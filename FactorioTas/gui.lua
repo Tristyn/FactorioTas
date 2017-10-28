@@ -65,10 +65,10 @@ end
 function tas.gui.toggle_editor_visible(player_index)
     fail_if_missing(player_index)
 
-    if global.gui.editor == nil then
-        tas.gui.show_editor(player_index)
-    else
+    if global.players[player_index].gui.root.style.visible == true then
         tas.gui.hide_editor(player_index)
+    else
+        tas.gui.show_editor(player_index)
     end
 end
 
@@ -111,20 +111,19 @@ function tas.gui.show_entity_info(player_index, entity)
     -- creates inventory transfer orders in the waypoint
 
     -- Collect inventories
-    local entity_inventories_table = util.entity.get_inventory_info(entity.type)
-    local entity_inventories = { }
-    local player_inventories_table = util.entity.get_inventory_info(character_entity.type)
+    local entity_inventories = util.entity.get_inventory_info(entity.type)
+    local player_inventories = util.entity.get_inventory_info(character_entity.type)
     gui.player_inventory.all_inventories = player_inventories
     -- Inventory Transfer UI
-    if entity_inventories ~= nil and #entity_inventories > 0 and player_inventories ~= nil and #player_inventories > 0 then
+    if #entity_inventories > 0 and #player_inventories > 0 then
 
         local entity_inventory_names = { }
-        for i = 1, #entity_inventories_table do
-            entity_inventory_names[i] = entity_inventories_table[i].name
+        for i = 1, #entity_inventories do
+            entity_inventory_names[i] = entity_inventories[i].name
         end
         local player_inventory_names = { }
-        for i = 1, #player_inventories_table do
-            player_inventory_names[i] = player_inventories_table[i].name
+        for i = 1, #player_inventories do
+            player_inventory_names[i] = player_inventories[i].name
         end
 
         --- Ensure that the inventory dropdowns are not null and set to entity inventories
@@ -135,21 +134,21 @@ function tas.gui.show_entity_info(player_index, entity)
         if player_inventories[gui.player_inventory.opened_inventory_index] == nil then
             gui.player_inventory.opened_inventory_index = 1
         end
-        -- -
+        ---
 
 
         -- Entity Inventory
 
-        --- 0.15 Impl
-
+        gui.entity_inventory.dropdown = gui.entity.add { type = "drop-down", selected_index = gui.entity_inventory.opened_inventory_index, items = entity_inventory_names, name = util.get_guid() }
+        tas.gui.register_dropdown_selection_changed_callback(gui.entity_inventory.dropdown, function(event, player_index) tas.gui.entity_current_inventory_dropdown_changed_callback(player_index, gui.entity_inventory) end)
 
         gui.entity_inventory.inventory_grid_container = gui.entity.add { type = "flow" }
         tas.gui.show_entity_info_transfer_inventory(player_index, gui.entity_inventory)
 
         -- Player Inventory
 
-        -- gui.player_inventory.dropdown = gui.entity.add { type = "drop-down", selected_index = gui.entity_inventory.opened_inventory_index, items = player_inventory_names, name = util.get_guid() }
-        -- tas.gui.register_dropdown_selection_changed_callback(gui.player_inventory.dropdown, function(event, player_index) tas.gui.entity_current_inventory_dropdown_changed_callback(player_index, gui.player_inventory) end)
+        gui.player_inventory.dropdown = gui.entity.add { type = "drop-down", selected_index = gui.player_inventory.opened_inventory_index, items = player_inventory_names, name = util.get_guid() }
+        tas.gui.register_dropdown_selection_changed_callback(gui.player_inventory.dropdown, function(event, player_index) tas.gui.entity_current_inventory_dropdown_changed_callback(player_index, gui.player_inventory) end)
 
         gui.player_inventory.inventory_grid_container = gui.entity.add { type = "flow" }
         tas.gui.show_entity_info_transfer_inventory(player_index, gui.player_inventory)
@@ -222,7 +221,7 @@ function tas.gui.build_inventory_names_list_box(container_element, inventory_lis
         tas.gui.register_click_callback(select_button, function(event)
 
             local element = event.element
-            if element.caption == "=" then
+            if element.caption == "=" then  
                 for _, list_box_entry_frame_name in pairs(list_box.children_names) do
                     -- TODO:  UNFINISHED 
                     --list_box[list_box_entry_frame_name].
@@ -297,7 +296,7 @@ function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index
 
     tas.gui.hide_waypoint_info(player_index)
 
-    local waypoint = global.sequences[sequence_index].waypoints[waypoint_index]
+    local waypoint = global.sequence_indexer.sequences[sequence_index].waypoints[waypoint_index]
     local gui = global.players[player_index].gui
     gui.sequence_index = sequence_index
     gui.waypoint_index = waypoint_index
@@ -377,7 +376,7 @@ function tas.gui.craft_orders_to_inventory(craft_orders)
         end
         --]]
 
-        local simple_item_stack = { name = craft_order.recipe.name, count = craft_order.count }
+        local simple_item_stack = { name = craft_order.recipe_name, count = craft_order.count }
         table.insert(inventory, simple_item_stack)
     end
 

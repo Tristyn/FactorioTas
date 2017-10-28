@@ -347,16 +347,9 @@ local entity_type_to_inventories_map = {
 }
 
 function util.entity.get_inventory_info(entity_type)
-    return entity_type_to_inventories_map[entity_type]
-end
-
-function util.entity.get_inventories(entity)
-    local ret = util.entity.get_inventory_info(entity.type)
-    for i = 0, #ret do
-        entry = ret[i]
-        entry.inventory = entity.get_inventory(entry.id)
-    end
-    return ret
+    local result = entity_type_to_inventories_map[entity_type]
+    if result == nil then return { } end
+    return result
 end
 
 --[Comment]

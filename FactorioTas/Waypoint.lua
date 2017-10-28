@@ -54,7 +54,7 @@ function Waypoint:assign_sequence(sequence, index)
     end
     if sequence.waypoints[index] ~= self then error() end
     
-    self.sequence = waypoint
+    self.sequence = sequence
     self.index = index
 end
 
@@ -69,7 +69,7 @@ function Waypoint:to_string()
 end
 
 function Waypoint.entity_to_string(waypoint_entity)
-	return util.entity.tostring(waypoint_entity)
+	return util.entity.to_string(waypoint_entity)
 end
 
 function Waypoint:get_entity()
@@ -117,7 +117,7 @@ function Waypoint:_destroy_highlight_entity()
 end
 
 function Waypoint:add_build_order_from_ghost_entity(ghost_entity)
-	local order = BuildOrder.new(ghost_entity)
+	local order = BuildOrder.new_from_ghost_entity(ghost_entity)
 	
 	local insert_index = #self.build_orders + 1
 	self.build_orders[insert_index] = order
@@ -131,7 +131,7 @@ function Waypoint:remove_build_order(index)
 end
 
 function Waypoint:add_craft_order(recipe_name, count)
-    fail_if_missing(recipe)
+    fail_if_missing(recipe_name)
 	fail_if_missing(count)
 	
 	
@@ -139,7 +139,7 @@ function Waypoint:add_craft_order(recipe_name, count)
 	local crafting_queue_end = craft_orders[#craft_orders]
 	
 	-- Merge with the last order if recipes match or append a new order to the end
-    if crafting_queue_end ~= nil and recipe == crafting_queue_end.recipe then
+    if crafting_queue_end ~= nil and recipe_name == crafting_queue_end.recipe_name then
 
         crafting_queue_end.count = crafting_queue_end.count + count
 

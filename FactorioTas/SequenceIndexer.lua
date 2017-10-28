@@ -1,25 +1,41 @@
 -- A fast index for objects and maintains the index as objects are modified. 
 
-local EntityIndexer = require("EntityIndexer")
+local Sequence = require("Sequence")
+local Waypoint = require("Waypoint")
 
 local SequenceIndexer = { }
 local metatable = { __index = SequenceIndexer }
+local readonly_sequence_metatable = {
+	__index = function(self, key) return self.__source[key] end,
+	__newindex = function() error("Attempt to modify readonly table") end,
+	__len = function(self) return #self.__source end,
+	__pairs = function(self) return pairs(self.__source) end,
+	__ipairs = function(self) return ipairs(self.__source) end 
+}
 
 function SequenceIndexer.set_metatable(instance)
 	if getmetatable(instance) ~= nil then
 		return
 	end
 
-	setmetatable(instance, { __index = instance._sequences })
-	setmetatable(instance._sequences, metatable)
+	setmetatable(instance, metatable)
+
+	setmetatable(instance.sequences, readonly_sequence_metatable)
+
+	for k, v in pairs(instance.sequences) do
+		Sequence.set_metatable(v)
+	end
 end
 
 function SequenceIndexer.new()
 	
 	local new = {
 		_waypoint_index = { },
-		_sequences = { }
+		_sequences_read_write = { },
+		sequences = { }
 	}
+	
+	new.sequences.__source = new._sequences_read_write
 
 	-- The callbacks requires a unique identity to be able to unregister so
 	-- create a function per instance
@@ -37,7 +53,7 @@ function SequenceIndexer:add_sequence(sequence)
 
 	sequence:on_changed(self._on_sequence_changed_delegate)
 
-	local sequences = self._sequences
+	local sequences = self._sequences_read_write
 	local insert_index = #sequences + 1
 	sequences[insert_index] = sequence
 
@@ -49,16 +65,19 @@ end
 
 function SequenceIndexer:remove_sequence(sequence)
 	fail_if_missing(sequence)
-	if self._sequences[sequence.index] ~= sequence then
+	
+	local sequences = self._sequences_read_write
+	
+	if sequences[sequence.index] ~= sequence then
 		error("Sequence was not in this collection")
 	end
 
 	sequence:unregister_on_changed(self._on_sequence_changed_delegate)
-	table.remove(self._sequences, sequence.index)
+	table.remove(sequences, sequence.index)
 
 	--update sequence indexes
-	for i = sequence.index, #self._sequences do
-		self._sequences[i]:set_index(i)
+	for i = sequence.index, #sequences do
+		sequences[i]:set_index(i)
 	end
 
 	for _, waypoint in pairs(sequence.waypoints) do

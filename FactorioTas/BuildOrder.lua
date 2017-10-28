@@ -22,7 +22,8 @@ function BuildOrder.new_from_ghost_entity(ghost_entity)
         position = ghost_entity.position,
         item_name = build_order_item_name,
         direction = ghost_entity.direction,
-        entity_name = ghost_entity.ghost_name
+        name = ghost_entity.ghost_name,
+        force_name = ghost_entity.force.name
     }
 
     BuildOrder.set_metatable(new)
@@ -54,7 +55,7 @@ function BuildOrder:can_reach(character)
         return false
     end
     
-    local hittest_entity = surface.create_entity( { name="entity-ghost", inner_name = self.entity_name, position = self.position, direction = self.direction })
+    local hittest_entity = surface.create_entity( { name="entity-ghost", inner_name = self.name, position = self.position, direction = self.direction })
     
     -- The function character.can_reach_entity() is off limits because
     -- it will always return true for entities such as ghost.
@@ -83,16 +84,19 @@ function BuildOrder:try_get_surface()
     end
 end
 
-function BuildOrder:try_build_object(player)
-    -- build_order.surface.create_entity( { name = build_order.entity_name, position = build_order.position, direction = build_order.direction })
-    -- in the future, calculate the players zoom
-    tas.runner.move_player_cursor(player, build_order.position)
-    local cursor = "empty";
-    if player.cursor_stack.valid_for_read then
-        cursor = player.cursor_stack.name
-    end
+function BuildOrder:spawn_object()
+    local surface = self:try_get_surface()
 
-    return player.build_from_cursor(click_position)
+    fail_if_invalid(surface)
+
+    local ent = surface.create_entity({
+        name = self.name,
+        position = self.position,
+        direction = self.direction,
+        force = self.force_name
+    })
+
+    fail_if_missing(ent)
 end
 
 return BuildOrder

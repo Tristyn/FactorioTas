@@ -31,9 +31,13 @@ function tas.runner.new_runner(sequence)
         return nil
     end
 
+    local surface = game.surfaces[sequence_start.surface_name]
+    local spawn_point = surface.find_non_colliding_position("player", { x=0, y=0}, 0, 1)
+    fail_if_missing(spawn_point)
+
     character = surface.create_entity { 
         name = "player", 
-        position = {0,0}, 
+        position = spawn_point, 
         force = "player" 
     }
 
@@ -48,7 +52,8 @@ function tas.runner.new_runner(sequence)
 
     global.runner = {
         sequence = sequence,
-        waypoint_index = 1,
+        -- start moving to waypoint 2
+        waypoint_index = math.min(2, #sequence.waypoints),
         active_build_orders = { },
         active_mine_orders = { },
         mining_finished_this_tick = false,
@@ -58,6 +63,10 @@ function tas.runner.new_runner(sequence)
     tas.runner.activate_build_orders_in_waypoint(global.runner, 1)
     tas.runner.activate_mine_orders_in_waypoint(global.runner, 1)
     tas.runner.activate_craft_orders_in_waypoint(global.runner, 1)
+    
+    tas.runner.activate_build_orders_in_waypoint(global.runner, 2)
+    tas.runner.activate_mine_orders_in_waypoint(global.runner, 2)
+    tas.runner.activate_craft_orders_in_waypoint(global.runner, 2)
 end
 
 -- Removes (and murders) the runner.
@@ -88,10 +97,10 @@ function tas.runner.runner_exists()
 end
 
 function tas.runner.ensure_runner_initialized()
-    tas.ensure_first_sequence_initialized(true)
+    tas.ensure_first_sequence_initialized()
 
     if tas.runner.runner_exists() == false then
-        tas.runner.new_runner(global.sequences[1])
+        tas.runner.new_runner(global.sequence_indexer.sequences[1])
     end
 end
 
@@ -163,8 +172,8 @@ function tas.runner.step_mining_state(runner, player)
     if runner.mining_completed_count < mine_order.count then
         -- mining_state makes the character mine under the cursor, but doesn't MOVE that cursor.
         -- use a different api call to move the cursor
+        character.update_selected_entity(mine_order.position)
         character.mining_state = { mining = true, position = mine_order.position }
-        tas.runner.move_player_cursor(player, mine_order.position)
         return true
     else
         character.mining_state = { mining = false }
@@ -214,19 +223,6 @@ end
 
 function tas.runner.can_reach_build_order(character, build_order)
     return build_order:can_reach(character)
-end
-
-function tas.runner.try_build_object(player, build_order)
-    -- build_order.surface.create_entity( { name = build_order.entity_name, position = build_order.position, direction = build_order.direction })
-    -- in the future, calculate the players zoom
-    tas.runner.move_player_cursor(player, build_order.position)
-    local cursor = "empty";
-    if player.cursor_stack.valid_for_read then
-        cursor = player.cursor_stack.name
-    end
-    msg_all("placing " .. build_order.item_name .. ", cursor: " .. cursor)
-
-    return player.build_from_cursor(click_position)
 end
 
 function tas.runner.tear_down_build_state(runner, remove_build_order)
@@ -294,30 +290,23 @@ function tas.runner.step_build_state(runner, player)
         local surface = game.surfaces[runner.in_progress_build_order.surface_name]
         -- Check for collisions with terrain or other entities.
         if surface.can_place_entity( {
-                name = runner.in_progress_build_order.entity_name,
+                name = runner.in_progress_build_order.name,
                 position = runner.in_progress_build_order.position,
                 direction = runner.in_progress_build_order.direction,
                 force = character.force
             } ) == false then
-            msg_all( { "TAS-err-generic", "Couldn't place a " .. runner.in_progress_build_order.entity_name .. " at {" .. runner.in_progress_build_order.position.x .. "," .. runner.in_progress_build_order.position.y .. "} because something was in the way." })
+            msg_all( { "TAS-err-generic", "Couldn't place a " .. runner.in_progress_build_order.name .. " at {" .. runner.in_progress_build_order.position.x .. "," .. runner.in_progress_build_order.position.y .. "} because something was in the way." })
             tas.runner.tear_down_build_state(runner, true)
 
             -- Check if the character ran out of placement range since last tick.
         elseif tas.runner.can_reach_build_order(character, runner.in_progress_build_order) == false then
-            msg_all( { "TAS-err-generic", "Couldn't place a " .. runner.in_progress_build_order.entity_name .. " at {" .. runner.in_progress_build_order.position.x .. "," .. runner.in_progress_build_order.position.y .. "} because the player left the area while putting the item in hand. Will retry." })
+            msg_all( { "TAS-err-generic", "Couldn't place a " .. runner.in_progress_build_order.name .. " at {" .. runner.in_progress_build_order.position.x .. "," .. runner.in_progress_build_order.position.y .. "} because the player left the area while putting the item in hand. Will retry." })
             tas.runner.tear_down_build_state(runner, false)
 
-            -- Actually place the entity. This may"Couldn't place a " .. runner.in_progress_build_order.entity_name .. " at {" .. runner.in_progress_build_order.position.x .. ","..runner.in_progress_build_order.position.y .. "} because  fail for reasons not explained in the docs.
-        elseif tas.runner.try_build_object(player, runner.in_progress_build_order) == false then
-            -- ?? failed to place the object. FUUUCK, something should be done here
-            -- Could be due to:
-            -- Was in range of placement last tick, but walked out of range
-            -- Ghosts, man
-            -- Never fails because it may collide with other objects
-            msg_all( { "TAS-err-generic", "Failed to place object {} at position {} for an unknown reason." })
-            tas.runner.tear_down_build_state(runner, true)
         else
             -- successsssss
+            player.cursor_stack.count = player.cursor_stack.count - 1
+            runner.in_progress_build_order:spawn_object()
             tas.runner.tear_down_build_state(runner, true)
         end
     end
@@ -326,7 +315,7 @@ end
 function tas.runner.activate_craft_orders_in_waypoint(runner, waypoint_index)
     for _, craft_order in ipairs(runner.sequence.waypoints[waypoint_index].craft_orders) do
         for i = 1, craft_order.count do
-            runner.character.begin_crafting( { count = 1, recipe = craft_order.recipe, silent = false })
+            runner.character.begin_crafting( { count = 1, recipe = craft_order.recipe_name, silent = false })
         end
     end
 end
