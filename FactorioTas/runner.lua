@@ -1,5 +1,3 @@
-local CharacterController = require("CharacterController")
-
 tas.runner =
 {
     playback_state =
@@ -33,9 +31,20 @@ function tas.runner.new_runner(sequence)
         return nil
     end
 
-    local character_controller = CharacterController.new()
+    character = surface.create_entity { 
+        name = "player", 
+        position = {0,0}, 
+        force = "player" 
+    }
 
-    character_controller.create_character(game.surfaces[sequence_start.surface_name])
+    -- insert items that are given at spawn
+    local quickbar = character.get_inventory(defines.inventory.player_quickbar)
+    quickbar.insert( { name = "burner-mining-drill", count = 1 })
+    quickbar.insert( { name = "stone-furnace", count = 1 })
+    local main_inv = character.get_inventory(defines.inventory.player_main)
+    main_inv.insert( { name = "iron-plate", count = 8 })
+    main_inv.insert( { name = "pistol", count = 1 })
+    main_inv.insert( { name = "firearm-magazine", count = 10 })
 
     global.runner = {
         sequence = sequence,
@@ -43,8 +52,7 @@ function tas.runner.new_runner(sequence)
         active_build_orders = { },
         active_mine_orders = { },
         mining_finished_this_tick = false,
-        character = character_controller.get_character(),
-        character_controller = character_controller
+        character = character
     }
 
     tas.runner.activate_build_orders_in_waypoint(global.runner, 1)

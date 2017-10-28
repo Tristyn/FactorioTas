@@ -2,15 +2,18 @@
 lib/factorio_0.*/config
 lib/factorio_0.*/data
 lib/factorio_0.*/doc-html
+lib/factorio_0.*/temp
 lib/factorio_0.*/tests
 lib/factorio_0.*/achievements-modded.dat
 lib/factorio_0.*/achievements.dat
 lib/factorio_0.*/config-path.cfg
+lib/factorio_0.*/blueprint-storage.dat
 lib/factorio_0.*/crop-cache.dat
 lib/factorio_0.*/player-data.json
 lib/factorio_0.*/mods/mod-list.json
 lib/factorio_0.*/mods/FactorioTas_*
 lib/factorio_0.*/saves
+
 lib/factorio_0.*/temp
 
 ## Ignore Visual Studio temporary files, build results, and

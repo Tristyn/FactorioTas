@@ -361,27 +361,9 @@ end
 
 --[Comment]
 -- Returns a string representation of `entity` which can be used as a table index.
--- If fields position, surface and force are changed then the index is stale state.
-function util.entity.get_hash_string(entity)
-    return entity.position.x .. '_' .. entity.position.y .. '_' .. entity.surface.name .. '_' .. entity.type .. '_' .. entity.force.name
-end
-
---[Comment]
--- Returns a collection of properties from `entity` which can be used to get that entity using util.entity.get_from_hash_object().
--- If fields position, surface and force are changed then the index is stale state.
-function util.entity.get_hash(entity)
-    return { position = entity.position, surface = entity.surface.name, name = entity.name, force = entity.force.name }
-end
-
---[Comment]
--- Returns an entity from a hash created by util.entity.get_hash()
--- May return nil if the entity was not found.
-function util.entity.find(hash_object)
-    local entities = game.surfaces[hash_object.surface].find_entities_filtered(hash_object)
-    if #entities > 1 then
-        error("Multiple entities returned from util.entity.find_from_hash")
-    end
-    return entities[1]
+-- If fields position and surface are changed then the index is stale state.
+function util.entity.to_string(entity)
+    return entity.position.x .. '_' .. entity.position.y .. '_' .. entity.surface.name .. '_' .. entity.name
 end
 
 function util.find_entity(surface_name, entity_name, position)
