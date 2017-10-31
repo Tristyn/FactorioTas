@@ -47,28 +47,12 @@ function BuildOrder:set_index(index)
     self.index = index
 end
 
-function BuildOrder:can_reach(character)
-    fail_if_invalid(character) 
+function BuildOrder:get_entity()
+    return util.find_entity(self.surface_name, self.name, self.position)
+end
 
-    local surface = self:try_get_surface()
-    if surface == nil then
-        return false
-    end
-    
-    local hittest_entity = surface.create_entity( { name="entity-ghost", inner_name = self.name, position = self.position, direction = self.direction })
-    
-    -- The function character.can_reach_entity() is off limits because
-    -- it will always return true for entities such as ghost.
-    
-    local selection_box_world_space = math.rectangle.translate(hittest_entity.prototype.selection_box, hittest_entity.position)
-    local distance = math.distance_rectangle_to_point(selection_box_world_space, character.position)
-    local can_reach = distance < util.get_build_distance(character) - 0.5
-    -- Include a 0.5 margin of error because this isn't the exact reach distance formula.
-    
-    -- destroy the ephemeral entity that was created earlier in the function
-    hittest_entity.destroy()
-        
-    return can_reach
+function BuildOrder:can_reach(character)
+    return util.can_reach(character, self.surface_name, self.name, self.position)
 end
 
 --[Comment]

@@ -64,9 +64,11 @@ function tas.runner.new_runner(sequence)
     tas.runner.activate_mine_orders_in_waypoint(global.runner, 1)
     tas.runner.activate_craft_orders_in_waypoint(global.runner, 1)
     
-    tas.runner.activate_build_orders_in_waypoint(global.runner, 2)
-    tas.runner.activate_mine_orders_in_waypoint(global.runner, 2)
-    tas.runner.activate_craft_orders_in_waypoint(global.runner, 2)
+    if #sequence.waypoints > 1 then
+        tas.runner.activate_build_orders_in_waypoint(global.runner, 2)
+        tas.runner.activate_mine_orders_in_waypoint(global.runner, 2)
+        tas.runner.activate_craft_orders_in_waypoint(global.runner, 2)
+    end
 end
 
 -- Removes (and murders) the runner.
@@ -128,10 +130,6 @@ function tas.runner.activate_mine_orders_in_waypoint(runner, waypoint_index)
     end
 end
 
-function tas.runner.can_reach_mine_order(character, mine_order)
-    return character.can_reach_entity(mine_order.entity)
-end
-
 function tas.runner.tear_down_mine_state(runner, remove_mine_order)
     if remove_mine_order == true then
         table.remove(runner.active_mine_orders, runner.in_progress_mine_order_index)
@@ -149,7 +147,7 @@ function tas.runner.step_mining_state(runner, player)
     if runner.in_progress_mine_order == nil then
         -- find the next mine order
         for mine_order_index, mine_order in ipairs(runner.active_mine_orders) do
-            if tas.runner.can_reach_mine_order(character, mine_order) then
+            if mine_order:can_reach(character) then
                 runner.in_progress_mine_order = mine_order
                 runner.in_progress_mine_order_index = mine_order_index
                 runner.mining_completed_count = 0

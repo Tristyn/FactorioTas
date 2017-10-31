@@ -83,6 +83,14 @@ function tas.gui.hide_entity_info(player_index)
 
     local gui = global.players[player_index].gui
 
+    if is_valid(gui.player_inventory.dropdown) then
+        tas.gui.unregister_dropdown_selection_changed_callbacks(gui.player_inventory.dropdown)
+    end
+
+    if is_valid(gui.entity_inventory.dropdown) then
+        tas.gui.unregister_dropdown_selection_changed_callbacks(gui.entity_inventory.dropdown)
+    end
+
     if gui.entity ~= nil then
         gui.entity.destroy()
         gui.entity = nil
@@ -98,9 +106,10 @@ function tas.gui.show_entity_info(player_index, entity)
 
     tas.gui.hide_entity_info(player_index)
 
-    gui.entity_object = entity
-    gui.entity_inventory.entity = entity
-    gui.player_inventory.entity = character_entity
+    gui.entity_info = {
+        surface_name = entity.surface.name,
+        position = entity.position,
+        name = entity.name }
 
     gui.entity = gui.entity_container.add { type = "frame", direction = "vertical", caption = entity.localised_name }
 
@@ -113,6 +122,7 @@ function tas.gui.show_entity_info(player_index, entity)
     -- Collect inventories
     local entity_inventories = util.entity.get_inventory_info(entity.type)
     local player_inventories = util.entity.get_inventory_info(character_entity.type)
+    gui.entity_inventory.all_inventories = entity_inventories
     gui.player_inventory.all_inventories = player_inventories
     -- Inventory Transfer UI
     if #entity_inventories > 0 and #player_inventories > 0 then
@@ -140,7 +150,7 @@ function tas.gui.show_entity_info(player_index, entity)
         -- Entity Inventory
 
         gui.entity_inventory.dropdown = gui.entity.add { type = "drop-down", selected_index = gui.entity_inventory.opened_inventory_index, items = entity_inventory_names, name = util.get_guid() }
-        tas.gui.register_dropdown_selection_changed_callback(gui.entity_inventory.dropdown, function(event, player_index) tas.gui.entity_current_inventory_dropdown_changed_callback(player_index, gui.entity_inventory) end)
+        tas.gui.register_dropdown_selection_changed_callback(gui.entity_inventory.dropdown, tas.gui.handle_inventory_transfer_dropdown_changed)
 
         gui.entity_inventory.inventory_grid_container = gui.entity.add { type = "flow" }
         tas.gui.show_entity_info_transfer_inventory(player_index, gui.entity_inventory)
@@ -148,7 +158,7 @@ function tas.gui.show_entity_info(player_index, entity)
         -- Player Inventory
 
         gui.player_inventory.dropdown = gui.entity.add { type = "drop-down", selected_index = gui.player_inventory.opened_inventory_index, items = player_inventory_names, name = util.get_guid() }
-        tas.gui.register_dropdown_selection_changed_callback(gui.player_inventory.dropdown, function(event, player_index) tas.gui.entity_current_inventory_dropdown_changed_callback(player_index, gui.player_inventory) end)
+        tas.gui.register_dropdown_selection_changed_callback(gui.player_inventory.dropdown,  tas.gui.handle_inventory_transfer_dropdown_changed)
 
         gui.player_inventory.inventory_grid_container = gui.entity.add { type = "flow" }
         tas.gui.show_entity_info_transfer_inventory(player_index, gui.player_inventory)
@@ -180,7 +190,20 @@ function tas.gui.show_entity_info(player_index, entity)
     end
 end
 
-function tas.gui.entity_current_inventory_dropdown_changed_callback(player_index, inventory_viewmodel)
+function tas.gui.handle_inventory_transfer_dropdown_changed(dropdown_element, player_index)
+    local inventory_viewmodel = nil
+    local gui = global.players[player_index].gui
+
+
+    if gui.player_inventory.dropdown == dropdown_element then
+        inventory_viewmodel = gui.player_inventory
+    elseif gui.entity_inventory.dropdown == dropdown_element then
+        inventory_viewmodel = gui.entity_inventory
+    else
+        error()
+    end
+
+    
     inventory_viewmodel.opened_inventory_index = inventory_viewmodel.dropdown.selected_index
     tas.gui.show_entity_info_transfer_inventory(player_index, inventory_viewmodel)
 end
@@ -196,49 +219,7 @@ function tas.gui.show_entity_info_transfer_inventory(player_index, inventory_vie
 
     
     inventory_viewmodel.inventory_grid_container.clear()
-    tas.gui.build_inventory_names_list_box(inventory_viewmodel.inventory_grid_container, inventory_info, function(event) end)
     tas.gui.build_inventory_grid_control(inventory_viewmodel.inventory_grid_container, inventory, "item/", tas.gui.entity_info_transfer_inventory_clicked_callback)
-end
-
---[Comment]
--- Creates a list of inventory names with a selector
--- argument `inventory_list` is a table of inventory names as strings
--- Invokes `clicked_callback(event)` when the selector button is clicked.
--- argument `event` is a table that contains:
---- element :: LuaGuiElement: The clicked button element.
---- player_index :: uint: The player who did the clicking.
---- inventory_name :: string: The name of the inventory
-function tas.gui.build_inventory_names_list_box(container_element, inventory_list, clicked_callback)
-    local list_box = container_element.add { type = "flow", direction = "vertical" }
-    local selector_button_names = { }
-
-    for _, inventory_name in pairs(inventory_list) do
-        local list_entry = list_box.add { type = "frame", direction = "horizontal" }
-
-        local button_name = util.get_guid()
-        table.insert(selector_button_names, button_name)
-        local select_button = list_entry.add { type = "button", name = button_name, caption = "=" }
-        tas.gui.register_click_callback(select_button, function(event)
-
-            local element = event.element
-            if element.caption == "=" then  
-                for _, list_box_entry_frame_name in pairs(list_box.children_names) do
-                    -- TODO:  UNFINISHED 
-                    --list_box[list_box_entry_frame_name].
-                end
-                element.caption = "*"
-            elseif element.caption == "*" then
-                element.caption = "="
-            end
-            
-            event.inventory_name = inventory_name
-
-            clicked_callback(event)
-
-        end )
-
-        local label = list_entry.add { type = "label", caption = inventory_name }
-    end
 end
 
 function tas.gui.entity_info_transfer_inventory_clicked_callback(event)
@@ -307,8 +288,9 @@ function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index
     -- mine orders targeted at resources
     for _, mine_order in ipairs(waypoint.mine_orders) do
 
+        local mine_order_entity = mine_order:get_entity()
         -- only show mine orders from resources here
-        if mine_order.entity.type == "resource" then
+        if is_valid(mine_order_entity) and mine_order_entity.type == "resource" then
 
             -- collect all controls for a mine order into a single frame for easy removal later
             local mine_order_frame = gui.waypoint.add { type = "flow", direction = "vertical" }
@@ -419,7 +401,7 @@ end
 
 function tas.gui.mine_order_info_to_localised_string(mine_order)
     fail_if_missing(mine_order)
-    return { "TAS-mine-order-info", mine_order.count, mine_order.entity.localised_name }
+    return { "TAS-mine-order-info", mine_order.count, game.entity_prototypes[mine_order.name].localised_name }
 end
 
 function tas.gui.set_entity_reference_count(num_entity_references)
@@ -443,8 +425,11 @@ function tas.gui.refresh(player_index)
         tas.gui.show_waypoint_info(player_index, gui.sequence_index, gui.waypoint_index)
     end
 
-    if gui.entity_object ~= nil then
-        tas.gui.show_entity_info(player_index, gui.entity_object)
+    if gui.entity_info ~= nil then
+        local entity_object = util.find_entity(gui.entity_info.surface_name, gui.entity_info.name, gui.entity_info.position)
+        if is_valid(entity_object) then
+            tas.gui.show_entity_info(player_index, entity_object)
+        end
     end
 end
 

@@ -1,4 +1,5 @@
 local BuildOrder = require("BuildOrder")
+local MineOrder = require("MineOrder")
 
 local Waypoint = { }
 local metatable = { __index = Waypoint }
@@ -130,6 +131,19 @@ function Waypoint:remove_build_order(index)
 	self:_remove_order(self.build_orders, index)
 end
 
+function Waypoint:add_mine_order_from_entity(entity)
+	local order = MineOrder.new_from_entity(entity)
+
+	table.insert(self.mine_orders, order)
+	order:assign_waypoint(self, #self.mine_orders)
+
+	return order
+end
+
+function Waypoint:remove_mine_order(index)
+	self:_remove_order(self.mine_orders, index)
+end
+
 function Waypoint:add_craft_order(recipe_name, count)
     fail_if_missing(recipe_name)
 	fail_if_missing(count)
@@ -155,6 +169,38 @@ end
 
 function Waypoint:remove_craft_order(index)
 	self:_remove_order(self.craft_orders, index)
+end
+
+function Waypoint:add_item_transfer_order(is_player_receiving, player_inventory, container_inventory, items_to_transfer)
+    local order = ItemTransferOrder.new(is_player_receiving, player_inventory, container_inventory, items_to_transfer)
+
+	-- If we can't merge the order, then append it
+	
+    local combined_order = self:try_merge_item_transfer_order_with_collection(order)
+	
+	if combined_order ~= nil then
+		return combined_order
+	else
+		table.insert(self.item_transfer_orders, order)
+		order:assign_waypoint(self, #self.item_transfer_orders)
+		return order
+	end
+end
+
+function Waypoint:remove_item_transfer_order(index)
+	self:_remove_order(self.item_transfer_orders, index)
+end
+
+--[Comment]
+-- Attempts to merge with any existing orders.
+-- Returns the order that it was merged into or nil if none were possible.
+function Waypoint:_try_merge_item_transfer_order_with_collection(order)
+	for _, existing in pairs(self.item_transfer_orders) do
+		if existing:can_merge(order) then
+			existing:merge(order)
+			return existing
+		end
+	end
 end
 
 function Waypoint:_remove_order(table, index)

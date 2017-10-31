@@ -281,7 +281,7 @@ end
 function tas.find_build_order_from_entity(ghost_entity)
     for sequence_index, sequence in ipairs(global.sequence_indexer.sequences) do
         for waypoint_index, waypoint in ipairs(sequence.waypoints) do
-            local build_order_index = tas.scan_table_for_value(waypoint.build_orders, function(build_order) return build_order.entity end, ghost_entity)
+            local build_order_index = tas.scan_table_for_value(waypoint.build_orders, function(build_order) return build_order:get_entity() end, ghost_entity)
             if build_order_index ~= nil then
                 return {
                     sequence = sequence,
@@ -297,7 +297,7 @@ function tas.find_build_order_from_entity(ghost_entity)
 end
 
 function tas.find_mine_order_from_entity_and_waypoint(entity, waypoint)
-    local key = tas.scan_table_for_value(waypoint.mine_orders, function(order) return order.entity end, entity)
+    local key = tas.scan_table_for_value(waypoint.mine_orders, function(order) return order:get_entity() end, entity)
 
     if key == nil then return nil end
 
@@ -480,16 +480,6 @@ function tas.on_built_waypoint(created_entity, player_index)
     
 end
 
-function tas.new_mine_order(entity, num_to_mine)
-    return
-    {
-        position = entity.position,
-        surface = entity.surface,
-        count = num_to_mine,
-        entity = entity
-    }
-end
-
 function tas.set_mine_order_count(mine_order, new_count)
     local indexes = tas.get_mine_order_indexes(mine_order)
 
@@ -505,7 +495,11 @@ function tas.destroy_mine_order(mine_order)
 
     if indexes == nil then return false end
 
-    table.remove(indexes.waypoint.mine_orders, indexes.mine_order_index)
+    if mine_order.waypoint == nil then
+        error("Orphan mine order")
+    end
+    
+    mine_order.waypoint:remove_mine_order(mine_order.index)
 
     return true
 end
@@ -541,13 +535,12 @@ function tas.add_mine_order(player_index, entity)
     local find_result = tas.find_mine_order_from_entity_and_waypoint(entity, player_data.waypoint)
 
     if find_result ~= nil then
-        if entity.type == "resource" then
-            local existing_mine_order = find_result.mine_order
-            existing_mine_order.count = existing_mine_order.count + 1
+        local mine_order = find_result.mine_order
+        if mine_order.can_set_count() == true then
+            mine_order.set_count(mine_order.get_count() + 1)
         end
     else
-        local new_mine_order = tas.new_mine_order(entity, 1)
-        table.insert(player_data.waypoint.mine_orders, new_mine_order)
+        player_data.waypoint:add_mine_order_from_entity(entity)
 
         tas.update_players_hover()
     end
@@ -590,8 +583,7 @@ function tas.on_pre_removing_ghost(ghost_entity)
     local find_result = tas.find_build_order_from_entity(ghost_entity)
 
     if find_result == nil then return end
-
-    table.remove(find_result.waypoint.build_orders, find_result.build_order_index)
+    find_result.waypoint:remove_build_order(find_result.build_order.index)
 end
 
 function tas.on_pre_mined_entity(event)
@@ -617,82 +609,23 @@ function tas.on_pre_mined_entity(event)
 end
 
 function tas.destroy_craft_order(craft_order)
-    local indexes = tas.get_craft_order_indexes(craft_order)
-
-    if indexes == nil then return false end
-
-    table.remove(indexes.waypoint.craft_orders, indexes.craft_order_index)
+    craft_order.waypoint:remove_craft_order(craft_order.index)
 
     return true
-end
-
-function tas.new_item_transfer_order(container_entity, is_player_receiving, player_inventory, container_inventory, items_to_transfer)
-    if container_entity ~= util.get_inventory_owner(container_inventory) then
-        error()
-    end
-
-    if items_to_transfer.count == nil then items_to_transfer.count = 1 end
-
-    return
-    {
-        is_player_receiving = is_player_receiving,
-        container_entity = container_entity,
-        container_inventory = container_inventory,
-        player_inventory = player_inventory,
-        item_stack = items_to_transfer
-    }
 end
 
 function tas.add_item_transfer_order(player_index, is_player_receiving, player_inventory, container_entity, container_inventory, items_to_transfer)
     local player_data = tas.try_get_player_data(player_index)
     if player_data == nil then error("Could not create a item transfer order because no waypoint was selected.") end
-    local existing_orders = player_data.waypoint.item_transfer_orders
 
-    local order = tas.new_item_transfer_order(container_entity, is_player_receiving, player_inventory, container_inventory, items_to_transfer)
-
-    -- If we can't merge the order, append it
-    if not tas.try_merge_item_transfer_order_with_collection(order, existing_orders) then
-        table.insert(existing_orders, order)
-    end
-
-
+    player_data.waypoint:add_item_transfer_order(is_player_receiving, player_inventory, container_inventory, items_to_transfer)
+    
 end
 
 function tas.destroy_item_transfer_order(item_transfer_order)
-    local indexes = tas.get_item_transfer_order_indexes(item_transfer_order)
-    if indexes == nil then return false end
-
-    table.remove(indexes.waypoint.item_transfer_orders, indexes.item_transfer_order_index)
+    item_transfer_order.waypoint:remove_item_transfer_order(item_transfer_order.index)
 
     return true
-end
-
-function tas.can_item_transfer_orders_be_merged(order_a, order_b)
-    return order_a.item_stack.name == order_b.item_stack.name
-    and order_a.is_player_receiving == order_b.is_player_receiving
-    and order_a.source_inventory == order_b.source_inventory
-    and order_a.target_inventory == order_b.target_inventory
-end
-
-function tas.merge_item_transfer_orders(source, destination)
-    if not tas.can_item_transfer_orders_be_merged(source, destination) then
-        error("Attempted to merge two item transfer orders that are incompatible.")
-    end
-
-    destination.count = destination.item_stack.count + source.item_stack.count
-    source.item_stack.count = 0
-    -- Not actually needed for bug free code but let's throw this in for safety
-end
-
-function tas.try_merge_item_transfer_order_with_collection(item_transfer_order, item_transfer_order_collection)
-    for existing_order_index, existing_order in ipairs(item_transfer_order_collection) do
-        if tas.can_item_transfer_orders_be_merged(item_transfer_order, existing_order) then
-            tas.merge_item_transfer_orders(item_transfer_order, existing_order)
-            return true
-        end
-    end
-
-    return false
 end
 
 function tas.on_crafted_item(event)
@@ -785,8 +718,10 @@ function tas.update_player_hover(player, player_entity)
     -- check if it's a build order
     local find_result = tas.find_build_order_from_entity(selected)
     if find_result ~= nil then
-        if find_result.build_order.entity ~= nil and find_result.waypoint.entity ~= nil then
-            local arrow = tas.create_arrow(find_result.build_order.entity, find_result.waypoint.entity)
+        local build_order_entity = find_result.build_order:get_entity()
+        local waypoint_entity = find_result.waypoint:get_entity()
+        if is_valid(build_order_entity) and is_valid(waypoint_entity) then
+            local arrow = tas.create_arrow(build_order_entity, waypoint_entity)
             tas.insert_arrow_into_auto_update_respository(arrow)
             table.insert(player.hover_arrows, arrow)
         end
@@ -801,39 +736,49 @@ function tas.update_player_hover(player, player_entity)
 
         -- create arrows to waypoints adjacent to this one
         local prev = waypoint.sequence.waypoints[waypoint.index - 1]
-        if prev ~= nil and prev.entity ~= nil and prev.entity.valid == true then
-            local arrow = tas.create_arrow(prev.entity, selected)
-            tas.insert_arrow_into_auto_update_respository(arrow)
-            table.insert(player.hover_arrows, arrow)
+        if prev ~= nil then
+            local prev_waypoint_entity = prev:get_entity() 
+            if is_valid(prev_waypoint_entity) then
+                local arrow = tas.create_arrow(prev_waypoint_entity, selected)
+                tas.insert_arrow_into_auto_update_respository(arrow)
+                table.insert(player.hover_arrows, arrow)
+            end
         end
 
         local next_ = waypoint.sequence.waypoints[waypoint.index + 1]
-        if next_ ~= nil and next_.entity ~= nil and next_.entity.valid == true then
-            local arrow = tas.create_arrow(selected, next_.entity)
-            tas.insert_arrow_into_auto_update_respository(arrow)
-            table.insert(player.hover_arrows, arrow)
+        if next_ ~= nil then
+            local next_waypoint_entity = next_:get_entity()
+            if is_valid(next_waypoint_entity) then
+                local arrow = tas.create_arrow(selected, next_waypoint_entity)
+                tas.insert_arrow_into_auto_update_respository(arrow)
+                table.insert(player.hover_arrows, arrow)
+            end
         end
 
         -- create arrows to all mine orders
         for _, mine_order in ipairs(waypoint.mine_orders) do
-            if mine_order.entity ~= nil and mine_order.entity.valid == true then
-                local arrow = tas.create_arrow(selected, mine_order.entity)
+            local mine_order_entity = mine_order:get_entity()
+            if is_valid(mine_order_entity) then
+                local arrow = tas.create_arrow(selected, mine_order_entity)
                 tas.insert_arrow_into_auto_update_respository(arrow)
                 table.insert(player.hover_arrows, arrow)
             end
         end
 
-    else
+    else -- generic entity, check if it is referenced by any mine orders
+
         local orders = tas.find_mine_orders_from_entity(selected)
         if #orders > 0 then
             for _, indexes in ipairs(orders) do
-                local arrow = tas.create_arrow(indexes.mine_order.entity, indexes.waypoint.entity)
-                tas.insert_arrow_into_auto_update_respository(arrow)
-                table.insert(player.hover_arrows, arrow)
+                local mine_order_entity = indexes.mine_order:get_entity()
+                local waypoint_entity = indexes.waypoint:get_entity()
+                if is_valid(mine_order_entity) and is_valid(waypoint_entity) then
+                    local arrow = tas.create_arrow(mine_order_entity, waypoint_entity)
+                    tas.insert_arrow_into_auto_update_respository(arrow)
+                    table.insert(player.hover_arrows, arrow)
+                end
             end
         end
-
-        return
     end
 end
 

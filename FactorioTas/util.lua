@@ -81,6 +81,24 @@ function util.get_guid()
     return global.guid_count
 end
 
+function util.can_reach(character, entity_surface_name, entity_name, entity_position)
+    fail_if_invalid(character)
+
+    if entity_surface_name ~= character.surface.name then
+        return false
+    end
+    
+    -- The function character.can_reach_entity() is off limits because
+    -- it will always return true for entities such as ghost.
+    
+    local selection_box_world_space = math.rectangle.translate(game.entity_prototypes[entity_name].selection_box, entity_position)
+    local distance = math.distance_rectangle_to_point(selection_box_world_space, character.position)
+    local can_reach = distance < util.get_build_distance(character) - 0.5
+    -- Include a 0.5 margin of error because this isn't the exact reach distance formula.
+            
+    return can_reach
+end
+
 -- Calculates the players walking speed.
 function util.get_walking_speed(character)
     -- the commented code is used to calculate walking speed bonus from armor modules, which doesn't work ATM.
