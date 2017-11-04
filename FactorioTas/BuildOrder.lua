@@ -31,6 +31,22 @@ function BuildOrder.new_from_ghost_entity(ghost_entity)
     return new
 end
 
+function BuildOrder.new_from_template(template)
+    local new = util.assign_table({}, template)
+    new.position = util.assign_table({}, template.position)
+
+    BuildOrder.set_metatable(new)
+
+    return new
+end
+
+function BuildOrder:to_template()
+    local template = util.assign_table({}, self)
+    template.position = util.assign_table({}, self.position)
+    template.waypoint = nil
+    return template
+end
+
 function BuildOrder:assign_waypoint(waypoint, index)
     if self.waypoint ~= nil then
         error("A waypoint can only be assigned once.") 

@@ -44,6 +44,37 @@ function Sequence.new(add_spawn_waypoint, add_initial_crafting_queue)
     return sequence
 end
 
+function Sequence.new_from_template(template)
+    local new = util.assign_table({}, template)
+
+    new.waypoints = { }
+    new._on_changed_callbacks = { }
+
+    Sequence.set_metatable(new)
+
+    for index, waypoint_template in pairs(template.waypoints) do
+        local waypoint = Waypoint.new_from_template(waypoint_template)
+        table.insert(new.waypoints, waypoint)
+        waypoint.assign_sequence(new, index)
+    end
+
+    return new
+end
+
+function Sequence:to_template()
+    local template = util.assign_table({}, self)
+
+    template.waypoints = { }
+    for index, waypoint in pairs(self.waypoints) do
+        local waypoint_template = waypoint:to_template()
+        table.insert(template.waypoints, waypoint_template)
+    end
+
+    template._on_changed_callbacks = nil
+
+    return template
+end
+
 function Sequence:set_index(index)
     self.index = index
 end

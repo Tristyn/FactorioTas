@@ -21,6 +21,22 @@ function ItemTransferOrder.new(is_player_receiving, player_inventory, container_
 	return new
 end
 
+function ItemTransferOrder.new_from_template(template)
+	local new = util.assign_table({}, template)
+	new.container_position = util.assign_table({}, template.container_position)
+
+	ItemTransferOrder.set_metatable(new)
+
+	return new
+end
+
+function ItemTransferOrder:to_template()
+	local template = util.assign_table({}, self)
+	template.container_position = util.assign_table({}, self.container_position)
+	template.waypoint = nil
+	return template
+end
+
 function ItemTransferOrder:assign_waypoint(waypoint, index)
 	fail_if_missing(waypoint)
 	fail_if_missing(index)

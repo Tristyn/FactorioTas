@@ -1,5 +1,7 @@
 local BuildOrder = require("BuildOrder")
 local MineOrder = require("MineOrder")
+local CraftOrder = require("CraftOrder")
+local ItemTransferOrder = require("ItemTransferOrder")
 
 local Waypoint = { }
 local metatable = { __index = Waypoint }
@@ -15,6 +17,19 @@ function Waypoint.set_metatable(instance)
 	for k, v in pairs(instance.build_orders) do
 		BuildOrder.set_metatable(v)
 	end
+
+	for k, v in pairs(instance.mine_orders) do
+		MineOrder.set_metatable(v)
+	end
+
+	for k, v in pairs(instance.craft_orders) do
+		CraftOrder.set_metatable(v)
+	end
+
+	for k, v in pairs(instance.item_transfer_orders) do
+		ItemTransferOrder.set_metatable(v)
+	end
+
 end
 
 -- [Comment]
@@ -47,6 +62,80 @@ function Waypoint.new(surface_name, position, spawn_entity)
 	end
 	
 	return new
+end
+
+function Waypoint.new_from_template(template)
+	local new = util.assign_table({}, template)
+	new.position = util.assign_table({}, template.position)
+	
+	new.build_orders = { }
+	new.mine_orders = { }
+	new.craft_orders = { }
+	new.item_transfer_orders = { }
+	new._on_changed_callbacks = { }
+
+	Waypoint.set_metatable(new)
+
+	for index, order_template in pairs(template.build_orders) do
+		local order = BuildOrder.new_from_template(order_template)
+		table.insert(new.build_orders, order, index)
+		order:assign_waypoint(new, index)
+	end
+
+	for index, order_template in pairs(template.mine_orders) do
+		local order = MineOrder.new_from_template(order_template)
+		table.insert(new.mine_orders, order, index)
+		order:assign_waypoint(new, index)
+	end
+
+	for index, order_template in pairs(template.craft_orders) do
+		local order = CraftOrder.new_from_template(order_template)
+		table.insert(new.craft_orders, order, index)
+		order:assign_waypoint(new, index)
+	end
+
+	for index, order_template in pairs(template.item_transfer_orders) do
+		local order = ItemTransferOrder.new_from_template(order_template)
+		table.insert(new.item_transfer_orders, order, index)
+		order:assign_waypoint(new, index)
+	end
+
+	return new
+end
+
+function Waypoint:to_template()
+	local template = util.assign_table({}, self)
+	template.position = util.assign_table({}, self.position)
+	template.build_orders = { }
+	template.mine_orders = { }
+	template.craft_orders = { }
+	template.item_transfer_orders = { }
+
+	for index, order in pairs(self.build_orders) do
+		local order_template = order:to_template()
+		table.insert(template.build_orders, order_template)
+	end
+
+	for index, order in pairs(self.mine_orders) do
+		local order_template = order:to_template()
+		table.insert(template.mine_orders, order_template)
+	end
+
+	for index, order in pairs(self.craft_orders) do
+		local order_template = order:to_template()
+		table.insert(template.craft_orders, order_template)
+	end
+
+	for index, order in pairs(self.item_transfer_orders) do
+		local order_template = order:to_template()
+		table.insert(template.item_transfer_orders, order_template)
+	end
+
+
+	template.sequence = nil
+	template._on_changed_callbacks = nil
+
+	return template
 end
 
 function Waypoint:assign_sequence(sequence, index)
@@ -151,15 +240,16 @@ function Waypoint:add_craft_order(recipe_name, count)
 	
     local craft_orders = self.craft_orders
 	local crafting_queue_end = craft_orders[#craft_orders]
+
+	local craft_order = CraftOrder.new(recipe_name, count)
 	
 	-- Merge with the last order if recipes match or append a new order to the end
-    if crafting_queue_end ~= nil and recipe_name == crafting_queue_end.recipe_name then
+    if crafting_queue_end ~= nil crafting_queue_end:can_merge(craft_order) then
 
-        crafting_queue_end.count = crafting_queue_end.count + count
+        crafting_queue_end:merge(craft_order)
 
     else
 
-        local craft_order = { recipe_name = recipe_name, count = count }
         table.insert(craft_orders, craft_order)
 
 	end
@@ -300,6 +390,17 @@ end
 -- Ends further callbacks. Returns true if the handler was found.
 function Waypoint:unregister_on_changed(func)
 	table.remove(self._on_changed_callbacks, func)
+end
+
+--[Comment]
+-- Returns a collection containing lists of orders that are within this Waypoint.
+function Waypoint:_get_order_collections()
+	return {
+		self.build_orders,
+		self.mine_orders,
+		self.craft_orders,
+		self.item_transfer_orders
+	}
 end
 
 return Waypoint

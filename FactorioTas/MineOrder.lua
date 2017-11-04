@@ -19,6 +19,23 @@ function MineOrder.new_from_entity(entity)
 	return new
 end
 
+function MineOrder.new_from_template(template)
+	local new = util.assign_table({}, template)
+	new.position = util.assign_table({}, template.position)
+
+	ItemTransferOrder.set_metatable(new)
+
+	return new
+end
+
+function MineOrder:to_template()
+	local template = util.assign_table({}, self)
+	template.position = util.assign_table({}, self.position)
+	template.waypoint = nil
+	return template
+end
+
+
 function MineOrder:assign_waypoint(waypoint, index)
 	if self.waypoint ~= nil then
         error("A waypoint can only be assigned once.") 
