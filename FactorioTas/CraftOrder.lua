@@ -12,10 +12,11 @@ function CraftOrder.new(recipe_name, count)
     local new =
     {
         recipe_name = recipe_name,
-        count = count
     }
 
     CraftOrder.set_metatable(new)
+
+    new:set_count(count)
 
     return new
 end
@@ -50,6 +51,15 @@ function CraftOrder:set_index(index)
     self.index = index
 end
 
+function CraftOrder:get_count()
+    return self._count
+end
+
+function CraftOrder:set_count(value)
+    if value < 1 then error() end
+    self._count = value
+end
+
 --[Comment]
 -- Returns true if the provided craft order can merge into this one.
 function CraftOrder:can_merge(craft_order)
@@ -66,7 +76,7 @@ function CraftOrder:merge(craft_order)
         error()
     end
 
-    self.count = self.count + craft_order.count
+    self:set_count(self:get_count() + craft_order:get_count())
 end
 
 return CraftOrder

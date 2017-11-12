@@ -1,156 +1,133 @@
-tas.runner =
-{
-    playback_state =
-    {
-        paused = { },
-        tick_1_prepare_to_attach_runner = { },
-        tick_2_attach_runner = { },
-        tick_3_running = { },
-        tick_4_prepare_to_attach_player = { },
-        tick_5_attach_player = { }
-    },
+local BuildOrderDispatcher = require("BuildOrderDispatcher")
+local Sequence = require("Sequence")
 
-    playback_mode =
-    {
-        playing = { },
-        stepping = { }
-    }
-}
+local Runner = { }
+local metatable = { __index = Runner }
 
-function tas.runner.init_globals()
-    global.runner_state = { }
-    global.runner_state.playback_state = tas.runner.playback_state.paused
+function Runner.set_metatable(instance)
+	if getmetatable(instance) ~= nil then return end
+
+	setmetatable(instance, metatable)
+
+    Sequence.set_metatable(instance.sequence)
+    BuildOrderDispatcher.set_metatable(instance.build_order_dispatcher)
 end
 
--- Create a new runner and character entity
--- Returns nil if sequence is empty
-function tas.runner.new_runner(sequence)
+-- Create a new runner, returns nil if sequence is empty
+function Runner.new(sequence)
+	fail_if_missing(sequence)
+	
     local sequence_start = sequence.waypoints[1]
 
     if sequence_start == nil then
         return nil
     end
 
-    local surface = game.surfaces[sequence_start.surface_name]
-    local spawn_point = surface.find_non_colliding_position("player", { x=0, y=0}, 0, 1)
-    fail_if_missing(spawn_point)
-
-    character = surface.create_entity { 
-        name = "player", 
-        position = spawn_point, 
-        force = "player" 
-    }
-
-    -- insert items that are given at spawn
-    local quickbar = character.get_inventory(defines.inventory.player_quickbar)
-    quickbar.insert( { name = "burner-mining-drill", count = 1 })
-    quickbar.insert( { name = "stone-furnace", count = 1 })
-    local main_inv = character.get_inventory(defines.inventory.player_main)
-    main_inv.insert( { name = "iron-plate", count = 8 })
-    main_inv.insert( { name = "pistol", count = 1 })
-    main_inv.insert( { name = "firearm-magazine", count = 10 })
-
-    global.runner = {
-        sequence = sequence,
-        -- start moving to waypoint 2
-        waypoint_index = math.min(2, #sequence.waypoints),
-        active_build_orders = { },
-        active_mine_orders = { },
-        mining_finished_this_tick = false,
-        character = character
-    }
-
-    tas.runner.activate_build_orders_in_waypoint(global.runner, 1)
-    tas.runner.activate_mine_orders_in_waypoint(global.runner, 1)
-    tas.runner.activate_craft_orders_in_waypoint(global.runner, 1)
     
-    if #sequence.waypoints > 1 then
-        tas.runner.activate_build_orders_in_waypoint(global.runner, 2)
-        tas.runner.activate_mine_orders_in_waypoint(global.runner, 2)
-        tas.runner.activate_craft_orders_in_waypoint(global.runner, 2)
+    local new = {
+        sequence = sequence,
+        waypoint_index = 1,
+
+        build_order_dispatcher = BuildOrderDispatcher.new(),
+        in_progress_build_order = nil,
+
+        pending_mine_orders = { },
+        in_progress_mine_order = nil,
+        mine_order_started_tick = 0,
+
+        pending_craft_orders = { },
+        pending_craft_orders_num_crafted = { },
+    }
+    
+    Runner.set_metatable(new)
+
+    new:_process_waypoint_orders(sequence_start)
+    
+    return new
+end
+
+function Runner:_process_waypoint_orders(waypoint)
+    fail_if_missing(waypoint)
+
+    for k, order in pairs(waypoint.build_orders) do
+        self.build_order_dispatcher.add_order(order)
     end
-end
 
--- Removes (and murders) the runner.
--- Returns if the runner was alive.
-function tas.runner.remove_runner()
-    if tas.runner.runner_exists() == false then
-        return false
+    for _, mine_order in pairs(waypoint.mine_orders) do
+        self.pending_mine_orders[mine_order] = mine_order
     end
 
-    -- murder it
-    if global.runner.character.valid then
-        if global.runner.character.destroy() == false then
-            msg_all( { "TAS-err-generic", "couldn't destroy character :( pls fix" })
-        end
+    for _, craft_order in pairs(waypoint.craft_orders) do
+        self.pending_craft_orders[craft_order] = craft_order
+        self.pending_craft_orders_num_crafted[craft_order] = 0
     end
-
-    global.runner = nil
-    return true
-end
-
-function tas.runner.reset_runner()
-    tas.runner.remove_runner()
-    tas.runner.ensure_runner_initialized()
-end
-
-function tas.runner.runner_exists()
-    return global.runner ~= nil
-end
-
-function tas.runner.ensure_runner_initialized()
-    tas.ensure_first_sequence_initialized()
-
-    if tas.runner.runner_exists() == false then
-        tas.runner.new_runner(global.sequence_indexer.sequences[1])
-    end
-end
-
-function tas.runner.get_direction_to_waypoint(character, waypoint)
-    local walking_speed = util.get_walking_speed(character)
-    return util.get_directions(character.position, waypoint.position, walking_speed)
 end
 
 -- returns if the character has arrived at the waypoint
-function tas.runner.move_towards_waypoint(character, waypoint)
-    local direction_to_waypoint = tas.runner.get_direction_to_waypoint(character, waypoint)
-    character.walking_state = { walking = direction_to_waypoint ~= nil, direction = direction_to_waypoint }
+function Runner:_set_walking_state()
+    local character = self.player.character
+    
+    if character == nil then
+        return
+    end
+
+    local waypoint = self:_get_next_waypoint()
+    local direction_to_waypoint = waypoint:get_direction(character)
+
+    character.walking_state = { 
+		walking = direction_to_waypoint ~= nil, 
+		direction = direction_to_waypoint 
+	}
 end
 
-function tas.runner.move_player_cursor(player, world_position)
-    player.zoom = 1
-    player.cursor_position = util.surface_to_screen_position(world_position, player.position, 1, constants.indev_screen_resolution)
-    -- Note: update_selected_entity is needed for mining, but does not effect the placement of buildings via Player::build_from_cursor()
-    player.update_selected_entity(world_position)
-end
+function Runner:_step_build_state()
+    if self.in_progress_build_order == nil then
+        self.in_progress_build_order = self.build_order_dispatcher:find_completable_order_near_player(player)
+        self.build_order_dispatcher:remove_order(self.in_progress_build_order)
+    end
+    
+    local order = self.in_progress_build_order
 
-function tas.runner.activate_mine_orders_in_waypoint(runner, waypoint_index)
-    for _, mine_order in ipairs(runner.sequence.waypoints[waypoint_index].mine_orders) do
-        table.insert(runner.active_mine_orders, mine_order)
+    if order == nil then
+        return
+    end
+
+
+    if order:is_order_item_in_cursor_stack(self.player) == false then
+        if order.move_order_item_to_cursor_stack(self.player) == false then
+            build_order_dispatcher.add_order(order)
+            self.in_progress_build_order = nil
+        end
+    else
+        if order.spawn_entity_through_player(self.player) == false then
+            build_order_dispatcher.add_order(order)
+            self.in_progress_build_order = nil
+        else
+            self.in_progress_build_order = nil
+        end
     end
 end
 
-function tas.runner.tear_down_mine_state(runner, remove_mine_order)
-    if remove_mine_order == true then
-        table.remove(runner.active_mine_orders, runner.in_progress_mine_order_index)
-    end
+-- returns true if mining is in progress (and player mouse can't be used for another task)
+function Runner:_step_mine_state()
+    local character = self.player.character
 
-    runner.in_progress_mine_order = nil
-    runner.in_progress_mine_order_index = nil
-    runner.mining_completed_count = nil
-end
-
--- returns true if mining is in progress (and players mouse is in use)
-function tas.runner.step_mining_state(runner, player)
-    local character = runner.character
-
-    if runner.in_progress_mine_order == nil then
+    if self.in_progress_mine_order == nil then
         -- find the next mine order
-        for mine_order_index, mine_order in ipairs(runner.active_mine_orders) do
-            if mine_order:can_reach(character) then
-                runner.in_progress_mine_order = mine_order
-                runner.in_progress_mine_order_index = mine_order_index
-                runner.mining_completed_count = 0
+        for mine_order_index, mine_order in ipairs(self.pending_mine_orders) do
+
+            -- ensure tool durability remains
+            if character ~= nil and mine_order:has_sufficient_tool_durability(character) == false then 
+                game.print("Error: TAS does not know how to calculate time spent mining when a mining tool is about to break. Ensure that the character never runs out of mining tools. Cheating and breaking the last tool before mining.")
+                character.get_inventory(defines.inventory.player_tools)[1].clear()
+            end
+
+            if mine_order:can_mine(character) then
+
+                self.pending_mine_orders[mine_order] = nil
+                self.in_progress_mine_order = mine_order
+                self.mine_order_started_tick = game.tick
+
                 break
             end
         end
@@ -161,343 +138,136 @@ function tas.runner.step_mining_state(runner, player)
         return false
     end
 
+    local ticks_spent_mining = game.tick - mine_order_started_tick
+    local time_to_mine_once = mine_order:get_mining_time(character)
+    
+    -- check if resources should be awarded
+    if ticks_spent_mining % time_to_mine_once == 0 and mine_order_started_tick ~= game.tick then
+        local success = mine_order:mine(character)
+        if success == false then error() end
 
-    if runner.mining_finished_this_tick == true then
-        runner.mining_finished_this_tick = false
-        runner.mining_completed_count = runner.mining_completed_count + 1
-    end
+        mine_order:remove_durability(character)
 
-    if runner.mining_completed_count < mine_order.count then
-        -- mining_state makes the character mine under the cursor, but doesn't MOVE that cursor.
-        -- use a different api call to move the cursor
-        character.update_selected_entity(mine_order.position)
-        character.mining_state = { mining = true, position = mine_order.position }
-        return true
-    else
-        character.mining_state = { mining = false }
-        tas.runner.tear_down_mine_state(runner, true)
-        return true
-    end
-end
-
-function tas.runner.activate_build_orders_in_waypoint(runner, waypoint_index)
-    for _, build_order in ipairs(runner.sequence.waypoints[waypoint_index].build_orders) do
-        table.insert(runner.active_build_orders, build_order)
-    end
-end
-
--- Returns if the build order was active and was deactivated
-function tas.runner.try_deactivate_build_order(runner, build_order)
-    local index = tas.scan_table_for_value(runner.active_build_orders, function(order) return order end, build_order)
-
-    if index == nil then return false end
-
-    return table.remove(runner.active_build_orders, index) ~= nil
-end
-
-function tas.runner.move_items(target_stack, source_stack, character, overflow_inventories)
-    if target_stack == source_stack then return end
-
-    -- move items out of the stack
-    if target_stack.valid_for_read == true then
-        local inserted_count = util.insert_into_inventories(character, overflow_inventories, target_stack)
-        target_stack.count = target_stack.count - inserted_count
-
-        if target_stack.valid_for_read == true and target_stack.count ~= 0 then
-            -- valid_for_read may switch to false when count = 0
-            return false
-        end
-    end
-
-    target_stack.clear()
-
-    if target_stack.set_stack(source_stack) == false then
-        return false
-    end
-    source_stack.clear()
-
-    return true
-end
-
-function tas.runner.can_reach_build_order(character, build_order)
-    return build_order:can_reach(character)
-end
-
-function tas.runner.tear_down_build_state(runner, remove_build_order)
-    if remove_build_order == true then
-        table.remove(runner.active_build_orders, runner.in_progress_build_order_index)
-    end
-
-    runner.in_progress_build_order = nil
-    runner.in_progress_build_order_index = nil
-    runner.build_order_progress = nil
-end
-
-function tas.runner.step_build_state(runner, player)
-    local character = runner.character
-
-    if runner.in_progress_build_order == nil then
-        -- find the next build order
-        for build_order_index, build_order in ipairs(runner.active_build_orders) do
-            if tas.runner.can_reach_build_order(character, build_order)
-                and util.find_item_stack(character, constants.character_inventories, build_order.item_name) then
-
-                runner.in_progress_build_order = build_order
-                runner.in_progress_build_order_index = build_order_index
-                runner.build_order_progress = 1
-                break
+        if ticks_spent_mining / time_to_mine_once >= mine_order:get_count() then
+            -- mine order complete!
+            self.in_progress_mine_order = nil
+        else
+            -- mine for another round
+            
+            -- ensure tool durability remains
+            if mine_order:has_sufficient_tool_durability(character) == false then 
+                game.print("Error: TAS does not know how to calculate time spent mining when a mining tool is about to break. Ensure that the character never runs out of mining tools. Cheating and breaking the last tool before mining.")
+                character.get_inventory(defines.inventory.player_tools)[1].clear()
             end
         end
     end
 
-    -- build_order_progress tracks the current tick in this multi-tick procedure
-    if runner.build_order_progress == 1 then
-        -- tick 1: Swap contents of players hand with the item to place
-        local item_to_place = util.find_item_stack(character, constants.character_inventories, runner.in_progress_build_order.item_name)
-
-        if item_to_place == nil then
-            msg_all( { "TAS-err-generic", "Could not place " .. runner.in_progress_build_order.item_name .. " because it wasn't in the inventory." })
-            tas.runner.tear_down_build_state(runner, true)
-            return
-        end
-
-        if tas.runner.move_items(player.cursor_stack, item_to_place, character, constants.character_inventories) == true then
-            runner.build_order_progress = 2
-        else
-            msg_all( { "TAS-err-generic", "Could not move items from the players hand into inventory because there wasn't room. Using cheats to delete the extra items.." })
-            player.cursor_stack.clear()
-            tas.runner.move_items(player.cursor_stack, item_to_place, character, constants.character_inventories)
-        end
-    elseif runner.build_order_progress == 2 then
-        -- tick 2: move cursor, place the item, and return item stack to inventory
-
-        -- Move items to the players hand once again incase the player was controlled at some point.
-        -- This is technically not cheating because we did this last tick.
-        local item_to_place = player.cursor_stack
-        if item_to_place.valid_for_read == false or item_to_place.name ~= runner.in_progress_build_order.item_name then
-            item_to_place = util.find_item_stack(character, constants.character_inventories, runner.in_progress_build_order.item_name)
-        end
-        if item_to_place == nil then
-            msg_all( { "TAS-err-generic", "Could not place " .. runner.in_progress_build_order.item_name .. " because it wasn't in the inventory." })
-            tas.runner.tear_down_build_state(runner, true)
-            return
-        end
-
-        tas.runner.move_items(player.cursor_stack, item_to_place, character, constants.character_inventories)
-
-        local surface = game.surfaces[runner.in_progress_build_order.surface_name]
-        -- Check for collisions with terrain or other entities.
-        if surface.can_place_entity( {
-                name = runner.in_progress_build_order.name,
-                position = runner.in_progress_build_order.position,
-                direction = runner.in_progress_build_order.direction,
-                force = character.force
-            } ) == false then
-            msg_all( { "TAS-err-generic", "Couldn't place a " .. runner.in_progress_build_order.name .. " at {" .. runner.in_progress_build_order.position.x .. "," .. runner.in_progress_build_order.position.y .. "} because something was in the way." })
-            tas.runner.tear_down_build_state(runner, true)
-
-            -- Check if the character ran out of placement range since last tick.
-        elseif tas.runner.can_reach_build_order(character, runner.in_progress_build_order) == false then
-            msg_all( { "TAS-err-generic", "Couldn't place a " .. runner.in_progress_build_order.name .. " at {" .. runner.in_progress_build_order.position.x .. "," .. runner.in_progress_build_order.position.y .. "} because the player left the area while putting the item in hand. Will retry." })
-            tas.runner.tear_down_build_state(runner, false)
-
-        else
-            -- successsssss
-            player.cursor_stack.count = player.cursor_stack.count - 1
-            runner.in_progress_build_order:spawn_object()
-            tas.runner.tear_down_build_state(runner, true)
-        end
-    end
-end
-
-function tas.runner.activate_craft_orders_in_waypoint(runner, waypoint_index)
-    for _, craft_order in ipairs(runner.sequence.waypoints[waypoint_index].craft_orders) do
-        for i = 1, craft_order.count do
-            runner.character.begin_crafting( { count = 1, recipe = craft_order.recipe_name, silent = false })
-        end
-    end
-end
-
-function tas.runner.are_waypoint_goals_satisfied(runner, player)
-    local waypoint = runner.sequence.waypoints[runner.waypoint_index]
-    local walking_state = tas.runner.get_direction_to_waypoint(runner.character, waypoint)
-
-    -- Does the character have to walk to the next goal
-    if walking_state ~= nil then
-        return false
-    end
-
     return true
 end
 
-function tas.runner.step_runner(runner, attached_player)
-    local waypoint = runner.sequence.waypoints[runner.waypoint_index]
-    local character = runner.character
+function Runner:_step_crafting_state()
+    local craft_orders_completed = { }
 
-    local mouse_in_use = tas.runner.step_mining_state(runner, attached_player)
+    for _, craft_order in ipairs(self.pending_craft_orders) do
+        local num_crafted = self.pending_craft_orders_num_crafted[craft_order]
+        local craft_order_total = craft_order:get_count()
+        local num_remaining = craft_order_total - num_crafted
+
+        for i = 1, num_remaining do
+            local num_started = self.player.begin_crafting( { count = 1, recipe = craft_order.recipe_name, silent = false })
+            
+            if num_started < 1 then 
+                break 
+            end
+
+            num_crafted = num_crafted + num_started
+        end
+        
+        if num_crafted == craft_order_total then
+            craft_orders_completed[#craft_orders_completed] = craft_order
+        else
+            --game.print("[TAS] Runner: Can't craft " .. craft_order_count - num_actually_started_crafting .. " " .. craft_order.recipe_name .. ": not enough ingredients.")
+            self.pending_craft_orders_num_crafted[craft_order] = num_crafted
+        end
+    end
+
+    -- remove completed orders
+    for _, order in ipairs(craft_orders_completed) do
+        self.pending_craft_orders[order] = nil
+        self.pending_craft_orders_num_crafted[order] = nil
+    end
+end
+
+function Runner:_should_move_to_next_waypoint()
+    local waypoint = self._get_next_waypoint()
+    if waypoint == nil then
+        return false
+    end
+
+    if self.player.controller_type == defines.controllers.character then
+        return waypoint:has_character_arrived(self.player.character) == true 
+    elseif self.player.controller_type == defines.controllers.god then
+        return true
+    else
+        return false
+    end
+end
+
+function Runner.step()
+    local player = self.player
+    
+    if player == nil then
+        return
+    elseif is_valid(player) == false then
+        self.player = nil
+    end
+
+    if player.controller_type == defines.controllers.ghost then
+        return -- do respawn here
+    end
+
+    local character = player.character -- may be nil!
+    local waypoint = self:_get_current_waypoint()
+
+    local mouse_in_use = self:_step_mining_state()
 
     if mouse_in_use == false then
         -- check construction
-        tas.runner.step_build_state(runner, attached_player)
+        mouse_in_use = self:_step_build_state()
     end
 
     -- walk towards waypoint
-    tas.runner.move_towards_waypoint(character, runner.sequence.waypoints[runner.waypoint_index])
+    self:_set_walking_state()
 
     -- move ahead in the sequence
-    while tas.runner.are_waypoint_goals_satisfied(runner) == true do
-        if runner.waypoint_index == #runner.sequence.waypoints then
-            -- sequence complete
-            break
-        end
-
-        runner.waypoint_index = runner.waypoint_index + 1
-        tas.runner.move_towards_waypoint(character, runner.sequence.waypoints[runner.waypoint_index])
-        tas.runner.activate_build_orders_in_waypoint(runner, runner.waypoint_index)
-        tas.runner.activate_mine_orders_in_waypoint(runner, runner.waypoint_index)
-        tas.runner.activate_craft_orders_in_waypoint(runner, runner.waypoint_index)
+    while self:_should_move_to_next_waypoint() == true do
+        
+        self.waypoint_index = self.waypoint_index + 1
+        self._process_waypoint_orders(self._get_current_waypoint())
+        self:_set_walking_state()
     end
 end
 
-function tas.runner.on_tick()
-    if tas.runner.runner_exists() == false then return end
-    if tas.runner.is_playing() == false then return end
-
-    local runner = global.runner
-    local player = game.players[global.runner_state.playback_player_index]
-
-    if global.runner_state.playback_state == tas.runner.playback_state.tick_1_prepare_to_attach_runner then
-
-        tas.runner.prepare_to_attach_player(player)
-
-        global.runner_state.playback_state = tas.runner.playback_state.tick_2_attach_runner
-
-    elseif global.runner_state.playback_state == tas.runner.playback_state.tick_2_attach_runner then
-
-        tas.runner.attach_player(player, global.runner.character)
-
-        if global.runner_state.num_ticks_to_step ~= nil and global.runner_state.num_ticks_to_step == 0 then
-            global.runner_state.playback_state = tas.runner.playback_state.tick_4_prepare_to_attach_player
-        else
-            global.runner_state.playback_state = tas.runner.playback_state.tick_3_running
-        end
-
-    elseif global.runner_state.playback_state == tas.runner.playback_state.tick_3_running then
-
-        tas.runner.step_runner(runner, player)
-
-        -- decrement num_ticks_to_step and check if we should start to pause
-        if global.runner_state.num_ticks_to_step ~= nil then
-            global.runner_state.num_ticks_to_step = global.runner_state.num_ticks_to_step - 1
-
-            if global.runner_state.num_ticks_to_step <= 0 then
-                global.runner_state.playback_state = tas.runner.playback_state.tick_4_prepare_to_attach_player
-            end
-        end
-
-    elseif global.runner_state.playback_state == tas.runner.playback_state.tick_4_prepare_to_attach_player then
-
-        tas.runner.prepare_to_attach_player(player)
-
-        global.runner_state.playback_state = tas.runner.playback_state.tick_5_attach_player
-
-    elseif global.runner_state.playback_state == tas.runner.playback_state.tick_5_attach_player then
-
-        local player_original_character = global.runner_state.playback_player_original_character
-        tas.runner.attach_player(player, player_original_character)
-
-        global.runner_state.playback_state = tas.runner.playback_state.paused
-
+--[Comment]
+-- Sets the player that this runner will control while stepping.
+function Runner:set_player(player)
+    if player ~= nil and if_valid(player) == false then
+        error()
     end
 
+    self.player = player
 end
 
-function tas.runner.prepare_to_attach_player(player_entity)
-
-    -- Make character stand still
-    if player_entity.character ~= nil then
-        player_entity.character.walking_state = { walking = false }
-    end
-
-    -- move items from cursor to inventory.
-    if player_entity.cursor_stack.valid_for_read == true then
-        player_entity.get_inventory(defines.inventory.player_main).insert(player_entity.cursor_stack)
-        player_entity.cursor_stack.clear()
-    end
-
-    -- ensure zoom is reasonable.
-    -- If we can determine screen resolution and zoom, then we can just ensure zoom is >= 1
-    player_entity.zoom = 1
-
-    -- need to: reset player build rotation to 0
-    -- determine screen resolution by creating placeable-off-grid entity
-
+function Runner:get_sequence()
+    return self.sequence
 end
 
--- if character is nil, the player enters god mode
-function tas.runner.attach_player(player_entity, character)
-    if character ~= nil then
-        player_entity.set_controller( { type = defines.controllers.character, character = character })
-    else
-        player_entity.set_controller( { type = defines.controllers.god })
-    end
+function Runner:_get_current_waypoint()
+	return self.sequence.waypoints[self.waypoint_index]
 end
 
--- player_index is the user that will be controlled to run the sequence.
--- setting num_ticks_to_step to nil denotes that it will step indefinitely
-function tas.runner.play(player_index, num_ticks_to_step)
-    if global.runner_state.playback_state == tas.runner.playback_state.tick_1_prepare_to_attach_runner or
-        global.runner_state.playback_state == tas.runner.playback_state.tick_2_attach_runner or
-        global.runner_state.playback_state == tas.runner.playback_state.tick_3_running then
-        if num_ticks_to_step == nil then
-            -- begin running forever
-            global.runner_state.num_ticks_to_step = nil
-        elseif global.runner_state.num_ticks_to_step == nil then
-            global.runner_state.num_ticks_to_step = num_ticks_to_step
-        else
-            global.runner_state.num_ticks_to_step = global.runner_state.num_ticks_to_step + num_ticks_to_step
-        end
-
-        return
-    elseif global.runner_state.playback_state ~= tas.runner.playback_state.paused then
-        return
-    end
-
-    local player_entity = game.players[player_index]
-    local original_character = player_entity.character
-
-    tas.runner.ensure_runner_initialized()
-
-    global.runner_state.playback_state = tas.runner.playback_state.tick_1_prepare_to_attach_runner
-    global.runner_state.num_ticks_to_step = num_ticks_to_step
-
-    global.runner_state.playback_player_index = player_index
-    global.runner_state.playback_player_original_character = original_character
+function Runner:_get_next_waypoint()
+	return self.sequence.waypoints[self.waypoint_index + 1]
 end
 
-function tas.runner.pause()
-    if global.runner_state.playback_state ~= tas.runner.playback_state.tick_3_running then
-        return
-    end
-
-    global.runner_state.playback_state = tas.runner.playback_state.tick_4_prepare_to_attach_player
-end
-
-function tas.runner.on_pre_mined_entity(player_index, entity)
-    -- The only way to determine when a runner completes a mine order is when the mined event is fired
-    -- determine if the runner mined an item
-
-    if tas.runner.runner_exists() == false then return end
-
-    local player_character = game.players[player_index].character
-    local runner_character = global.runner.character
-
-    if runner_character == player_character then
-        global.runner.mining_finished_this_tick = true
-    end
-end
-
-function tas.runner.is_playing(player_index)
-    -- When there are multiple runners, check only if there is a runner using this specfiic player_index
-    return global.runner_state.playback_state ~= tas.runner.playback_state.paused
-end
+return Runner

@@ -15,8 +15,10 @@ constants = {
         defines.inventory.player_tools,
         defines.inventory.player_vehicle
     },
-    indev_screen_resolution = { x = 1918, y = 1013 },
-    debug = true
+    god_inventories = {
+        defines.inventory.god_main,
+        defines.inventory.god_quickbar
+    }
 }
 
 util = { }
@@ -81,8 +83,18 @@ function util.get_guid()
     return global.guid_count
 end
 
-function util.can_reach(character, entity_surface_name, entity_name, entity_position)
-    fail_if_invalid(character)
+function util.can_reach(player, entity_surface_name, entity_name, entity_position)
+    fail_if_invalid(player)
+    local controller_type = player.controller_type
+
+    if controller_type == defines.controllers.ghost then
+        return false
+    elseif controller_type == defines.controllers.god then
+        return true
+    end
+
+    -- logic for controller_type == defines.controllers.character
+    local character = player.character
 
     if entity_surface_name ~= character.surface.name then
         return false
@@ -206,6 +218,27 @@ function util.surface_to_screen_position(surface_position, player_position, play
     }
 end
 
+--[Comment]
+-- Gets the count of items in the inventories.
+-- Parameter inventories is a collection of defines.inventory
+-- Parameter item is the string name of the item prototype. If not specified, count all items.
+function util.get_item_count(entity, inventories, item)
+    fail_if_invalid(entity)
+    fail_if_missing(inventories)
+
+    local count = 0
+
+    for _, inventory_id in pairs(inventories) do
+        local inventory = entity.get_inventory(inventory_id)
+
+        if inventory ~= nil then
+            count = count + inventory.get_item_count(item)
+        end
+    end
+
+    return count
+end
+
 -- Gets the first LuaItemStack in the inventories of a given entity with the given name
 -- Parameter inventories is a collection of defines.inventory, see http://lua-api.factorio.com/latest/defines.html#defines.inventory.
 -- Returns the LuaItemStack and the inventory it resides in.
@@ -262,6 +295,30 @@ function util.remove_item_stack(entity, item_stack, inventories, player)
     return item_stack.count - num_to_remove
 end
 
+function util.move_item_stack(target_stack, source_stack, character, overflow_inventories)
+    if target_stack == source_stack then return end
+
+    -- move items out of the stack
+    if target_stack.valid_for_read == true then
+        local inserted_count = util.insert_into_inventories(character, overflow_inventories, target_stack)
+        target_stack.count = target_stack.count - inserted_count
+
+        if target_stack.valid_for_read == true and target_stack.count ~= 0 then
+            -- valid_for_read may switch to false when count = 0
+            return false
+        end
+    end
+
+    target_stack.clear()
+
+    if target_stack.set_stack(source_stack) == false then
+        return false
+    end
+    source_stack.clear()
+
+    return true
+end
+
 --[Comment]
 -- Inserts the item into the first empty slot of the the inventories. Does not reduce the 'count' property of the item_stack parameter.
 -- Parameter inventories is a collection of defines.inventory, see http://lua-api.factorio.com/latest/defines.html#defines.inventory.
@@ -300,6 +357,20 @@ function util.get_inventory_owner(inventory)
     local owner = inventory.entity_owner
     if owner ~= nil then return owner end
     return inventory.player_owner
+end
+
+--[Comment]
+-- Returns the inventories associated with the player. 
+function util.get_player_inventories(player)
+    fail_if_invalid(player)
+
+    if player.controller_type == defines.controllers.character then
+        return constants.character_inventories
+    elseif player.controller_type == defines.controllers.god then
+        return constants.god_inventories
+    else
+        return { }
+    end
 end
 
 util.entity = { }
@@ -387,6 +458,88 @@ function util.find_entity(surface_name, entity_name, position)
     return entities[1]
 end
 
+
+--[Comment]
+-- Gets the time required to mine an entity in ticks,
+-- as well as the tool durability lost from mining by hand.
+function util.get_mining_time_and_durability_loss(miner_entity, minable_entity_name)
+    -- reference: https://wiki.factorio.com/Mining#Mining_Speed_Formula
+    -- (Mining power - Mining hardness) * Mining speed / Mining time = Production rate/tick
+    -- Mining time / ((Mining power - Mining hardness) * Mining speed) = ticks for 1 product
+
+    fail_if_missing(miner_entity)
+    fail_if_missing(minable_entity)
+
+    local miner_prototype = game.entity_prototypes[miner_entity.name]
+    local minable_prototype = game.entity_prototypes[minable_entity_name]
+
+    local mining_power = miner_prototype.mining_power
+    local mining_speed = miner_prototype.mining_speed
+    local mining_hardness = minable_prototype.minable_properties.hardness
+    local mining_time = minable_prototype.minable_properties.mining_time
+    
+    if mining_power == nil then
+        -- default mining power is nil when entity type is not `mining_drill` and is `player`
+        -- player base mining power is not exposed by the api, so hardcode it
+        mining_power = 1
+    end
+
+    -- include tool power and character_mining_speed_modifier
+    if miner_entity.type == "player" then
+        
+        mining_speed = mining_speed * (1 + miner_entity.character_mining_speed_modifier)
+        
+        local miner_tool = miner_entity.get_inventory(defines.inventory.player_tools)[1]
+        if miner_tool.valid_for_read == true then
+            local tool_power = game.item_prototypes[miner_tool.name].speed
+            
+            mining_power = mining_power * tool_power
+        end
+    end
+
+    local time_in_ticks = mining_time / ((mining_power - mining_hardness) * mining_speed)
+    local durability_loss = time_in_ticks * mining_hardness
+
+    -- not sure if fractional ticks are rounded down or up. Round up to stay safe and not cheat.
+    time_in_ticks = math.ceil(time_in_ticks)
+    
+    return time_in_ticks, durability_loss
+end
+
+--[Comment]
+-- Spawns a character at the origin.
+-- parameter respawn:bool is optional; if true adds items given during respawn, 
+-- if false gives items during first spawn. Defaults to false.
+function util.spawn_character(respawn)
+    local surface = game.surfaces["nauvis"]
+    local spawn_point = surface.find_non_colliding_position("player", { x=0, y=0}, 0, 1)
+    fail_if_missing(spawn_point)
+
+    local character = surface.create_entity { 
+        name = "player", 
+        position = spawn_point,
+        force = "player" 
+    }
+    
+    local quickbar = character.get_inventory(defines.inventory.player_quickbar)
+    local main = character.get_inventory(defines.inventory.player_main)
+    local guns = character.get_inventory(defines.inventory.player_guns)
+    local ammo = character.get_inventory(defines.inventory.player_ammo)
+
+    -- insert items that are given at spawn and respawn
+    guns.insert( { name = "pistol", count = 1 })
+    ammo.insert( { name = "firearm-magazine", count = 10 })
+
+    if respawn == nil or respawn  == false then
+        quickbar.insert( { name = "burner-mining-drill", count = 1 })
+        quickbar.insert( { name = "stone-furnace", count = 1 })
+        main.insert( { name = "iron-plate", count = 8 })
+    end
+
+    return character
+
+end
+
 --[Comment]
 -- util.assign_table(target_table, source_table_1, source_table_2..)
 -- The util.assign_table() method is used to copy the values of all enumerable properties from one or more source tables to a target table.
@@ -406,4 +559,28 @@ function util.assign_table(target_table, ...)
     end
 
     return target_table
+end
+
+--[Comment]
+-- Wraps the function in a callable table to ensure uniqueness.
+-- Use this when a function variable must be unique, such as when used as a table key. 
+function util.function_delegate(func)
+    -- The ... and unpack keywords are dark corners of lua
+
+    -- Basically the __call metamethods treats the table as a callable function,
+    -- first argument of __call is the table being called, followed by the arguments of the call.
+    -- We want to discard the first argument, and forward the other to a call to `func`.
+    -- To do that we capture arg one in the variable `self` so it can be ignored,
+    -- and capture the subsequent arguments in the ... structure.  
+    -- Clone the call arguments we want into a table: {...} 
+    -- Then call the function where each table entry is an argument: func(unpack({...}))
+
+    -- This is some disgusting syntax yo 
+
+    local metatable = { __call = function(self, ...) func(unpack({...})) end }
+    
+    
+    local delegate = { }
+    setmetatable(delegate, metatable)
+    return delegate
 end

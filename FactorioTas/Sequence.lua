@@ -15,30 +15,25 @@ function Sequence.set_metatable(instance)
 	end
 end
 
-function Sequence.new(add_spawn_waypoint, add_initial_crafting_queue)
+function Sequence.new()
     
     local sequence = {
         waypoints = { },
         _on_changed_callbacks = { }
-	}
-	
+    }
+    
 	Sequence.set_metatable(sequence)
 
-    if add_spawn_waypoint == true then
-
-        local origin = { x = 0, y = 0 }
-        local new_waypoint = sequence:insert_waypoint(1, "nauvis", origin)
-        if new_waypoint == nil then
-            
-            game.print("Could not create a waypoint at spawn because one already exists there.")
+    local origin = { x = 0, y = 0 }
+    local new_waypoint = sequence:insert_waypoint(1, "nauvis", origin)
+    if new_waypoint == nil then
         
-        else
+        game.print("Could not create a waypoint at spawn because one already exists there.")
+        
+    else
             
-            if add_initial_crafting_queue == true then
-                new_waypoint:add_craft_order("iron-axe", 1)
-            end
+        new_waypoint:add_craft_order("iron-axe", 1)
 
-        end
     end
 
     return sequence
@@ -107,15 +102,26 @@ function Sequence:_insert_waypoint(insert_index, surface_name, position, waypoin
         self.waypoints[i]:set_index(i)
     end
 
-    self:_changed("add_waypoint", waypoint, insert_index)
+    self:_changed("add_waypoint", waypoint)
 
     return waypoint
+end
+
+function Sequence:can_remove_waypoint(index)
+    fail_if_missing(index)
+
+    -- ensure that there will never be zero waypoints in the sequence.
+    return #self.waypoints > 1
 end
 
 function Sequence:remove_waypoint(index)
     fail_if_missing(index)
 
-    if index < 1 or index > #waypoints then
+    if self:can_remove_waypoint(index) == false then
+        error()
+    end
+
+    if index < 1 or index > #self.waypoints then
         error("index out of range")
     end
 
@@ -124,18 +130,18 @@ function Sequence:remove_waypoint(index)
     for i = index, #self.waypoints do
         self.waypoints[i]:set_index(i)
     end
+    
+    waypoint:destroy()
 
-    self:_changed("remove_waypoint", waypoint, index)
+    self:_changed("remove_waypoint", waypoint)
 end
 
-function Sequence:_changed(type, waypoint, index)
+function Sequence:_changed(type, waypoint)
     local event = {
         sender = self,
         type = type,
         waypoint = waypoint,
-        index = index
     }
-    
     for k, handler in pairs(self._on_changed_callbacks) do
         handler(event)
     end
@@ -148,19 +154,17 @@ end
 -- sender :: The sequence that triggered the callback.
 -- type :: string: Can be [add_waypoint|remove_waypoint]
 -- waypoint :: Waypoint: The waypoint.
--- index :: uint: The index of the waypoint in the sequence.
 function Sequence:on_changed(func)
     fail_if_missing(func)
 
     if self._on_changed_callbacks[func] ~= nil then
+        --error("Function reference was not unique. Consider using util.function_delegate(func)")
         error()
     end
 
     self._on_changed_callbacks[func] = func
 end
 
---[Comment]
--- Ends further callbacks. Returns true if the handler was found.
 function Sequence:unregister_on_changed(func)
     fail_if_missing(func)
 

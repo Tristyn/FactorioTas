@@ -105,3 +105,5 @@ function collections.pairs_recursive(table_, types_whitelist)
         end
     end
 end
+
+return collections

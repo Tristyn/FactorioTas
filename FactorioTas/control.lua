@@ -1,13 +1,10 @@
-require "util"
-require "tas"
-require "gui"
-require "runner"
-collections = require "collections"
+local tas = require("tas")
 
-coroutine = require "coroutine"
-coroutine.empty = function() return coroutine.wrap( function() end) end
-inspect = require "inspect"
-json = require "JSON"
+require("util")
+require("gui")
+
+inspect = require("inspect")
+json = require("JSON")
 
 function msg_all(message)
     for _, p in pairs(game.players) do
@@ -37,7 +34,7 @@ function is_valid(entity)
         return false
     end
 
-    return entity.valid
+    return entity.valid == true
 end
 
 --[Comment]
@@ -57,20 +54,32 @@ function fail_if_invalid(entity, msg)
 end
 
 script.on_init( function()
-    local _, err = xpcall( function()
+    -- Dont capture and print error, players won't see it as they haven't been added to the game
+    -- Instead collect the traceback in err and rethrow.
+    local _, err = xpcall(function() 
         tas.init_globals()
         util.init_globals()
-        tas.runner.init_globals()
         tas.gui.init_globals()
-    end , debug.traceback)
-    if err then msg_all( { "TAS-err-specific", "on_init", err }) end
+
+        tas.set_metatable()
+    end, debug.traceback, event)
+
+    if err then
+        error(err)
+    end
 end )
 
 script.on_load( function()
-    local _, err = xpcall( function()
+    -- Dont capture and print error, printing will result in another error 
+    -- (resulting in loss of the initial stacktrace) because `game` is nil.
+    -- Instead collect the traceback in err and rethrow.
+    local _, err = xpcall(function() 
         tas.set_metatable()
-    end , debug.traceback)
-    if err then msg_all( { "TAS-err-specific", "on_load", err }) end
+    end, debug.traceback, event)
+    
+    if err then
+        error(err)
+    end
 end)
 
 script.on_event(defines.events.on_player_created, function(event)
@@ -79,7 +88,7 @@ script.on_event(defines.events.on_player_created, function(event)
 end )
 
 script.on_event(defines.events.on_gui_click, function(event)
-    local _, err = xpcall(tas.gui.on_click, debug.traceback, event)
+    local _, err = xpcall(tas.gui.on_click, debug.debug, event)
     if err then msg_all( { "TAS-err-specific", "on_gui_click", err }) end
 end )
 

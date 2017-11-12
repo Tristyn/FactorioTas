@@ -57,7 +57,7 @@ function Waypoint.new(surface_name, position, spawn_entity)
 	else
 		local existing = new:get_entity()
 		if is_valid(existing) then
-			new:_configure_entity(existing)
+			Waypoint._configure_entity(existing)
 		end
 	end
 	
@@ -166,24 +166,31 @@ function Waypoint:get_entity()
 	return util.find_entity(self.surface_name, "tas-waypoint", self.position)
 end
 
+function Waypoint.spawn_entity(surface, position)
+	fail_if_missing(surface)
+	fail_if_missing(position)
+
+	local entity = surface.create_entity { name = "tas-waypoint", position = position }
+	Waypoint._configure_entity(entity)
+end
+
 function Waypoint:_spawn_entity()
 
 	if util.find_entity(self.surface_name, "tas-waypoint", self.position) ~= nil then 
 		error("Waypoint object was created too close to another.")
 	end
 
-	local entity = game.surfaces[self.surface_name].create_entity { name = "tas-waypoint", position = self.position }
-	self:_configure_entity(entity)
+	Waypoint.spawn_entity(game.surfaces[self.surface_name], self.position)
 end
 
-function Waypoint:_configure_entity(entity)
+function Waypoint._configure_entity(entity)
 	entity.destructible = false
 end
 
 function Waypoint:_destroy_entity()
 	local entity = self:get_entity()
 	if is_valid(entity) == true then
-		entity.destry()
+		entity.destroy()
 	end
 end
 
@@ -202,7 +209,7 @@ end
 function Waypoint:_destroy_highlight_entity()
 	local highlight = self:_get_highlight_entity()
 	if is_valid(highlight) == true then
-		highlight.destry()
+		highlight.destroy()
 	end
 end
 
@@ -244,13 +251,14 @@ function Waypoint:add_craft_order(recipe_name, count)
 	local craft_order = CraftOrder.new(recipe_name, count)
 	
 	-- Merge with the last order if recipes match or append a new order to the end
-    if crafting_queue_end ~= nil crafting_queue_end:can_merge(craft_order) then
+    if crafting_queue_end ~= nil and crafting_queue_end:can_merge(craft_order) then
 
         crafting_queue_end:merge(craft_order)
 
     else
 
-        table.insert(craft_orders, craft_order)
+		table.insert(craft_orders, craft_order)
+		craft_order:assign_waypoint(self, #craft_orders)
 
 	end
 	
@@ -293,23 +301,23 @@ function Waypoint:_try_merge_item_transfer_order_with_collection(order)
 	end
 end
 
-function Waypoint:_remove_order(table, index)
-	fail_if_missing(table)
+function Waypoint:_remove_order(order_collection, index)
+	fail_if_missing(order_collection)
 	fail_if_missing(index)
 
-	if index < 1 or index > #table then
+	if index < 1 or index > #order_collection then
 		error("index out of range")
 	end
 	
-	table.remove(table, index)
+	table.remove(order_collection, index)
 
-	for i = index, #table do
-		table[i].set_index(i)
+	for i = index, #order_collection do
+		order_collection[i].set_index(i)
 	end
 end
 
 function Waypoint:move(surface_name, position)
-	Waypoint:_move(surface_name, position)
+	self:_move(surface_name, position)
 end
 
 function Waypoint:move_to_entity(waypoint_entity)
@@ -322,14 +330,8 @@ function Waypoint:_move(surface_name, position, new_entity)
 	fail_if_missing(surface_name)
 	fail_if_missing(position)
 
-	local event = {
-		sender = self,
-		type = "moved",
-		surface_name = surface_name,
-		position = position
-	}
-
-	self:_changed(event)
+	local old_surface_name = self.surface_name
+	local old_position = self.position
 
     -- clean up entities
     local old_waypoint_entity = self:get_entity()
@@ -353,22 +355,43 @@ function Waypoint:_move(surface_name, position, new_entity)
 	if self.highlighted == true then
 		self:_spawn_highlight_entity()
 	end
+
+	local event = {
+		sender = self,
+		type = "moved",
+		old_surface_name = old_surface_name,
+		old_position = old_position
+	}
+
+	self:_changed(event)
 end
 
 function Waypoint:set_highlight(highlighted)
-	if highlighted == true and self.highlighted == false then
+	self.highlighted = highlighted
+
+	if highlighted == true then
 		self:_spawn_highlight_entity()
-		game.highlighted = true
-	elseif highlighted == false and self.highlighted == true then
+	elseif highlighted == false then
 		self:_destroy_highlight_entity()
-		game.highlighted = false
 	else
 		error()
 	end
 end
 
+--[Comment]
+-- Returns a direction the character as to walk to move closer to the Waypoint.
+-- Returns nil if it would move over the Waypoint.
+function Waypoint:get_direction(character)
+	local walking_speed = util.get_walking_speed(character)
+    return util.get_directions(character.position, waypoint.position, walking_speed)
+end
+
+function Waypoint:has_character_arrived(character)
+	return self:get_direction(character) == nil
+end
+
 function Waypoint:_changed(event)
-	for _, func in pairs(self.on_changed_callbacks) do
+	for _, func in pairs(self._on_changed_callbacks) do
 		func(event)
 	end
 end
@@ -380,16 +403,22 @@ end
 -- type :: string: Can be any of [moved]
 -- Additional type specific parameters:
 -- -- moved
--- -- -- surface_name :: string
--- -- -- position :: table: {x , y}
+-- -- -- old_surface_name :: string
+-- -- -- old_position :: table: {x , y}
 function Waypoint:on_changed(func)
-	table.insert(self._on_changed_callbacks, func)
+	if self._on_changed_callbacks[func] ~= nil then
+		error()
+	end
+	self._on_changed_callbacks[func] = func
 end
 
 --[Comment]
 -- Ends further callbacks. Returns true if the handler was found.
 function Waypoint:unregister_on_changed(func)
-	table.remove(self._on_changed_callbacks, func)
+	if self._on_changed_callbacks[func] == nil then
+		error()
+	end
+	self._on_changed_callbacks[func] = nil
 end
 
 --[Comment]
@@ -401,6 +430,15 @@ function Waypoint:_get_order_collections()
 		self.craft_orders,
 		self.item_transfer_orders
 	}
+end
+
+function Waypoint:destroy()
+	self:_destroy_entity()
+	self:set_highlight(false)
+
+	for k, order in pairs(self.build_orders) do
+		order:destroy()
+	end
 end
 
 return Waypoint

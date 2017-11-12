@@ -1,3 +1,5 @@
+local tas = require("tas")
+
 tas.gui = { }
 
 function tas.gui.init_globals()
@@ -169,9 +171,9 @@ function tas.gui.show_entity_info(player_index, entity)
     if entity.minable == true and entity.type ~= "resource" then
 
         local mine_order_exists = false
-        local selected_items = tas.try_get_player_data(player_index)
-        if selected_items ~= nil and selected_items.waypoint ~= nil then
-            if tas.find_mine_order_from_entity_and_waypoint(entity, selected_items.waypoint) ~= nil then
+        local waypoint = global.players[player_index].waypoint
+        if waypoint ~= nil then
+            if tas.find_mine_order_from_entity_and_waypoint(entity, waypoint) ~= nil then
                 mine_order_exists = true
             end
         end
@@ -181,9 +183,9 @@ function tas.gui.show_entity_info(player_index, entity)
             if mine.state == true then
                 tas.add_mine_order(player_index, entity)
             else
-                local player_data = tas.try_get_player_data(player_index)
-                if player_data == nil then return end
-                local find_results = tas.find_mine_order_from_entity_and_waypoint(entity, player_data.waypoint)
+                local waypoint = global.players[player_index].waypoint
+                if waypoint == nil then return end
+                local find_results = tas.find_mine_order_from_entity_and_waypoint(entity, waypoint)
                 tas.destroy_mine_order(find_results.mine_order)
             end
         end )
@@ -240,8 +242,6 @@ function tas.gui.entity_info_transfer_inventory_clicked_callback(event)
         item_stack_count = game.item_prototypes[item_stack.name].stack_size
     elseif click_event.button == defines.mouse_button_type.right then
         item_stack_count = 5
-    else
-        return
     end
 
     tas.gui.new_item_transfer_order(player_index, gui.entity_inventory, gui.player_inventory, is_player_receiving, { name = item_stack.name, count = item_stack_count })
@@ -268,6 +268,30 @@ function tas.gui.hide_waypoint_info(player_index)
         gui.waypoint.destroy()
         gui.waypoint = nil
     end
+end
+
+function tas.gui.crafting_queue_item_clicked_callback(event)
+    local click_event = event.click_event
+    local gui = global.players[click_event.player_index].gui
+    local waypoint = global.sequence_indexer.sequences[gui.sequence_index].waypoints[gui.waypoint_index]
+    local craft_order = waypoint.craft_orders[event.item_stack_index]
+   
+
+    local items_to_remove = 1
+    if click_event.button == defines.mouse_button_type.left and click_event.shift then
+        items_to_remove = game.item_prototypes[event.item_stack.name].stack_size
+    elseif click_event.button == defines.mouse_button_type.right then
+        items_to_remove = 5
+    end
+
+    
+    if craft_order:get_count() > items_to_remove then
+        craft_order:set_count(craft_order:get_count() - items_to_remove)
+    else
+        waypoint:remove_craft_order(event.item_stack_index)
+    end
+    
+    tas.gui.refresh(click_event.player_index)
 end
 
 function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index)
@@ -326,11 +350,7 @@ function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index
     if #waypoint.craft_orders > 0 then
         gui.waypoint.add { type = "label", caption = "crafting queue" }
         local craft_orders_as_inventory = tas.gui.craft_orders_to_inventory(waypoint.craft_orders)
-        tas.gui.build_inventory_grid_control(gui.waypoint, craft_orders_as_inventory, "recipe/", function(event)
-            tas.destroy_craft_order(waypoint.craft_orders[event.item_stack_index])
-            tas.gui.unregister_click_callbacks(event.click_event.element)
-            tas.gui.refresh(event.click_event.player_index)
-        end )
+        tas.gui.build_inventory_grid_control(gui.waypoint, craft_orders_as_inventory, "recipe/", tas.gui.crafting_queue_item_clicked_callback)
     end
 
     -- item transfer orders
@@ -358,7 +378,7 @@ function tas.gui.craft_orders_to_inventory(craft_orders)
         end
         --]]
 
-        local simple_item_stack = { name = craft_order.recipe_name, count = craft_order.count }
+        local simple_item_stack = { name = craft_order.recipe_name, count = craft_order:get_count() }
         table.insert(inventory, simple_item_stack)
     end
 
@@ -401,7 +421,7 @@ end
 
 function tas.gui.mine_order_info_to_localised_string(mine_order)
     fail_if_missing(mine_order)
-    return { "TAS-mine-order-info", mine_order.count, game.entity_prototypes[mine_order.name].localised_name }
+    return { "TAS-mine-order-info", mine_order.get_count(), game.entity_prototypes[mine_order.name].localised_name }
 end
 
 function tas.gui.set_entity_reference_count(num_entity_references)
@@ -517,9 +537,9 @@ end
 
 function tas.gui.on_click(event)
     fail_if_missing(event)
-
     local element = event.element
     local player_index = event.player_index
+    local player = game.players[player_index]
     local gui = global.players[player_index].gui
 
     local waypoints = gui.waypoints
@@ -531,7 +551,7 @@ function tas.gui.on_click(event)
 
     if element == gui.editor_visible_toggle then
         tas.ensure_cheat_mode_enabled(player_index)
-        tas.ensure_first_sequence_initialized(true)
+        tas.ensure_first_sequence_initialized()
         tas.gui.toggle_editor_visible(player_index)
     elseif element == gui.waypoint_mode then
         if gui.current_state == "move" then
@@ -543,22 +563,18 @@ function tas.gui.on_click(event)
         end
     elseif element == gui.playback.play_pause then
         if element.caption == "play" then
-            tas.runner.play(player_index, nil)
+            global.playback_controller:play(player)
             element.caption = "pause"
         else
-            tas.runner.pause(player_index, nil)
+            global.playback_controller:pause()
             element.caption = "play"
         end
     elseif element == gui.playback.reset then
-        tas.runner.reset_runner()
-    elseif element == gui.playback.play then
-        tas.runner.play(player_index, nil)
-    elseif element == gui.playback.pause then
-        tas.runner.pause()
+        global.playback_controller:reset()
     elseif element == gui.playback.step then
         local num_ticks = tonumber(gui.playback.step_ticks.text)
         if num_ticks ~= nil then
-            tas.runner.play(player_index, num_ticks)
+            global.playback_controller:play(player, num_ticks)
         end
     end
 end
