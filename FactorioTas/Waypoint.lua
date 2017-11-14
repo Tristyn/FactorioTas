@@ -65,8 +65,8 @@ function Waypoint.new(surface_name, position, spawn_entity)
 end
 
 function Waypoint.new_from_template(template)
-	local new = util.assign_table({}, template)
-	new.position = util.assign_table({}, template.position)
+	local new = util.clone_table(template)
+	new.position = util.clone_table(template.position)
 	
 	new.build_orders = { }
 	new.mine_orders = { }
@@ -104,8 +104,8 @@ function Waypoint.new_from_template(template)
 end
 
 function Waypoint:to_template()
-	local template = util.assign_table({}, self)
-	template.position = util.assign_table({}, self.position)
+	local template = util.clone_table(self)
+	template.position = util.clone_table(self.position)
 	template.build_orders = { }
 	template.mine_orders = { }
 	template.craft_orders = { }
@@ -270,11 +270,12 @@ function Waypoint:remove_craft_order(index)
 end
 
 function Waypoint:add_item_transfer_order(is_player_receiving, player_inventory, container_inventory, items_to_transfer)
-    local order = ItemTransferOrder.new(is_player_receiving, player_inventory, container_inventory, items_to_transfer)
+	
+	local order = ItemTransferOrder.new(is_player_receiving, player_inventory, container_inventory, items_to_transfer)
 
 	-- If we can't merge the order, then append it
 	
-    local combined_order = self:try_merge_item_transfer_order_with_collection(order)
+    local combined_order = self:_try_merge_item_transfer_order_with_collection(order)
 	
 	if combined_order ~= nil then
 		return combined_order
@@ -312,7 +313,7 @@ function Waypoint:_remove_order(order_collection, index)
 	table.remove(order_collection, index)
 
 	for i = index, #order_collection do
-		order_collection[i].set_index(i)
+		order_collection[i]:set_index(i)
 	end
 end
 
@@ -383,7 +384,7 @@ end
 -- Returns nil if it would move over the Waypoint.
 function Waypoint:get_direction(character)
 	local walking_speed = util.get_walking_speed(character)
-    return util.get_directions(character.position, waypoint.position, walking_speed)
+    return util.get_directions(character.position, self.position, walking_speed)
 end
 
 function Waypoint:has_character_arrived(character)

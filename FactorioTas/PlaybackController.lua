@@ -46,6 +46,8 @@ function PlaybackController.new()
 
     PlaybackController.set_metatable(new)
 
+    new:_apply_configuration(PlaybackConfiguration.new_paused())
+
     return new
 end
 
@@ -71,15 +73,16 @@ function PlaybackController:new_runner(sequence, controller_type)
         new.character = util.spawn_character()
     end
 
-    self.runner_instances[#self.runner_instances] = new
+    self.runner_instances[#self.runner_instances + 1] = new
 end
 
 -- Removes (and murders) the runner.
 function PlaybackController:remove_runner(runner)
     fail_if_missing(runner)
 
-    for i=1, i<#self.runner_instances do
-        if self.runner_instances[i].runner == runner then
+    for i=1, #self.runner_instances do
+        local instance = self.runner_instances[i]
+        if instance.runner == runner then
 
             -- murder it
             if is_valid(instance.character) then
@@ -97,12 +100,25 @@ function PlaybackController:remove_runner(runner)
     error()
 end
 
-function PlaybackController:get_runner(sequence)
-    -- ensure the sequence isn't already in use
+function PlaybackController:_get_runner_instance(sequence)
     for k, runner_instance in pairs(self.runner_instances) do
         if runner_instance.runner:get_sequence() == sequence then
-            return runner_instance.runner
+            return runner_instance
         end
+    end
+end
+
+function PlaybackController:get_runner(sequence)
+    local instance = self:_get_runner_instance(sequence)
+    if instance ~= nil then 
+        return instance.runner
+    end
+end
+
+function PlaybackController:try_get_character(sequence)
+    local instance = self:_get_runner_instance(sequence)
+    if instance ~= nil then
+        return instance.character
     end
 end
 
@@ -111,12 +127,12 @@ function PlaybackController:runners_exist()
 end
 
 function PlaybackController:_reset_runners()
-    local runner_instances_clone = util.assign_table({}, self.runner_instances)
-    for i = 1, i < #runner_instances_clone do
-        local runner = self.runner_instances[i].runner
+    local runner_instances_clone = util.clone_table(self.runner_instances)
+    for i = 1, #runner_instances_clone do
+        local runner = runner_instances_clone[i].runner
         local sequence = runner:get_sequence()
         self:remove_runner(runner)
-        self:new_runner(sequence)
+        self:new_runner(sequence, runner_instances_clone[i].controller_type)
     end
 end
 
@@ -133,57 +149,59 @@ function PlaybackController:on_tick()
 
     if self.playback_state == PlaybackController.playback_state.tick_1_prepare_to_attach_runner then
 
-        self:prepare_to_attach_player(player)
+        self:freeze_player(player)
 
         self.playback_state = PlaybackController.playback_state.tick_2_attach_runner
 
     elseif self.playback_state == PlaybackController.playback_state.tick_2_attach_runner then
         self:attach_player(player, character)
         player.cheat_mode = false
-
-        if self.num_times_to_step > 0 then
-            self.playback_state = PlaybackController.playback_state.tick_3_running
-        else
-            self.playback_state = PlaybackController.playback_state.tick_4_prepare_to_attach_player
-        end
+        self.playback_state = PlaybackController.playback_state.tick_3_running
 
     elseif self.playback_state == PlaybackController.playback_state.tick_3_running then
 
         runner:set_player(player)
         runner:step()
 
-        self.runner_being_stepped_index = self.runner_being_stepped_index + 1
-
         if self.runner_being_stepped_index < #self.runner_instances then
-            -- move to the next runner next tick
+            self.runner_being_stepped_index = self.runner_being_stepped_index + 1
             self.playback_state = PlaybackController.playback_state.tick_1_prepare_to_attach_runner
         else
-            -- check for a pending configuration change and check if we should pause.
-            if self.configuration_after_runners_have_stepped ~= nil then
-               self.playback_state = PlaybackController.playback_state.tick_4_prepare_to_attach_player
-            elseif self.num_times_to_step ~= nil then
-                self.num_times_to_step = self.num_times_to_step - 1
+            if self.configuration_after_runners_have_stepped == nil then
+                self.runner_being_stepped_index = 1
 
-                if self.num_times_to_step <= 0 then
-                    self.playback_state = PlaybackController.playback_state.tick_4_prepare_to_attach_player
+                if #self.runner_instances ~= 1 then
+                    -- only attach a new player if there are multiple runners to switch between
+                    self.playback_state = PlaybackController.playback_state.tick_1_prepare_to_attach_runner
                 end
+
+                if self.num_times_to_step ~= nil then
+                    self.num_times_to_step = self.num_times_to_step - 1
+                    
+                    if self.num_times_to_step <= 0 then
+                        self.playback_state = PlaybackController.playback_state.tick_4_prepare_to_attach_player
+                    end
+                end
+            else
+                -- Get ready to apply the pending configuration.
+                self.playback_state = PlaybackController.playback_state.tick_4_prepare_to_attach_player
             end
 
         end
 
     elseif self.playback_state == PlaybackController.playback_state.tick_4_prepare_to_attach_player then
 
-        self:prepare_to_attach_player(player)
+        self:freeze_player(player)
 
         self.playback_state = PlaybackController.playback_state.tick_5_attach_player
 
     elseif self.playback_state == PlaybackController.playback_state.tick_5_attach_player then
-
+        
         local player_original_character = self.configuration.player_character_after_playback_completes
         self:attach_player(player, player_original_character)
         player.cheat_mode = true
 
-        if self.configuration ~= nil then
+        if self.configuration_after_runners_have_stepped ~= nil then
             self:_apply_configuration(self.configuration_after_runners_have_stepped)
         else
             self:_apply_configuration(PlaybackConfiguration.new_paused())
@@ -191,7 +209,7 @@ function PlaybackController:on_tick()
     end
 end
 
-function PlaybackController:prepare_to_attach_player(player_entity)
+function PlaybackController:freeze_player(player_entity)
 
     -- Make character stand still
     if player_entity.character ~= nil then
@@ -210,16 +228,22 @@ end
 -- Sets the player controller to the character.
 -- if character is nil, the player enters god mode.
 function PlaybackController:attach_player(player_entity, character)
+    self:freeze_player(player_entity)
+
     if character ~= nil then
         player_entity.set_controller( { type = defines.controllers.character, character = character })
     else
         player_entity.set_controller( { type = defines.controllers.god })
     end
+
+    self:freeze_player(player_entity)
 end
 
 --[Comment]
 -- Immediately applies the PlaybackConfiguration.
 function PlaybackController:_apply_configuration(config)
+    fail_if_missing(config)
+
     if config.mode == PlaybackConfiguration.mode.pause then
         self.configuration = config
         self.playback_state = nil
@@ -227,7 +251,7 @@ function PlaybackController:_apply_configuration(config)
         self.runner_being_stepped_index = nil
     elseif config.mode == PlaybackConfiguration.mode.reset then
         self:_reset_runners()
-        self.configuration = Configuration.new_paused()
+        self.configuration = PlaybackConfiguration.new_paused()
         self.playback_state = nil
         self.num_times_to_step = nil
         self.runner_being_stepped_index = nil
@@ -242,13 +266,16 @@ function PlaybackController:_apply_configuration(config)
 end
 
 function PlaybackController:reset()
+    local config = PlaybackConfiguration.new_reset()
+
     if self:is_paused() then
-        self:_apply_configuration(PlaybackConfiguration.new_paused())
+        self:_apply_configuration(config)
     else
-        self.configuration_after_runners_have_stepped = PlaybackConfiguration.new_reset()
+        self.configuration_after_runners_have_stepped = config
     end
 end
--- playeris the user that will be controlled to run the sequence.
+
+-- player is the user that will be controlled to run the sequence.
 -- setting num_times_to_step to nil denotes that it will step indefinitely.
 function PlaybackController:play(player_entity, num_times_to_step)
     fail_if_invalid(player_entity)

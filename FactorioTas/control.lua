@@ -1,5 +1,6 @@
 local tas = require("tas")
 
+require("math")
 require("util")
 require("gui")
 
@@ -88,7 +89,7 @@ script.on_event(defines.events.on_player_created, function(event)
 end )
 
 script.on_event(defines.events.on_gui_click, function(event)
-    local _, err = xpcall(tas.gui.on_click, debug.debug, event)
+    local _, err = xpcall(tas.gui.on_click, debug.traceback, event)
     if err then msg_all( { "TAS-err-specific", "on_gui_click", err }) end
 end )
 

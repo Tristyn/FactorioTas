@@ -71,8 +71,12 @@ function Runner:_set_walking_state()
         return
     end
 
+    local direction_to_waypoint = nil
     local waypoint = self:_get_next_waypoint()
-    local direction_to_waypoint = waypoint:get_direction(character)
+
+    if waypoint ~= nil then
+        direction_to_waypoint = waypoint:get_direction(character)
+    end
 
     character.walking_state = { 
 		walking = direction_to_waypoint ~= nil, 
@@ -82,27 +86,34 @@ end
 
 function Runner:_step_build_state()
     if self.in_progress_build_order == nil then
-        self.in_progress_build_order = self.build_order_dispatcher:find_completable_order_near_player(player)
+        self.in_progress_build_order = self.build_order_dispatcher:find_completable_order_near_player(self.player)
+        if self.in_progress_build_order == nil then
+            return false
+        end
+
         self.build_order_dispatcher:remove_order(self.in_progress_build_order)
     end
     
     local order = self.in_progress_build_order
 
     if order == nil then
-        return
+        return false
     end
 
 
     if order:is_order_item_in_cursor_stack(self.player) == false then
-        if order.move_order_item_to_cursor_stack(self.player) == false then
+        if order.move_order_item_to_cursor_stack(self.player) == true then
+            return true
+        else
             build_order_dispatcher.add_order(order)
             self.in_progress_build_order = nil
         end
     else
-        if order.spawn_entity_through_player(self.player) == false then
-            build_order_dispatcher.add_order(order)
+        if order.spawn_entity_through_player(self.player) == true then
             self.in_progress_build_order = nil
+            return true
         else
+            build_order_dispatcher.add_order(order)
             self.in_progress_build_order = nil
         end
     end
@@ -133,7 +144,7 @@ function Runner:_step_mine_state()
         end
     end
 
-    local mine_order = runner.in_progress_mine_order
+    local mine_order = self.in_progress_mine_order
     if mine_order == nil then
         return false
     end
@@ -165,41 +176,36 @@ function Runner:_step_mine_state()
     return true
 end
 
-function Runner:_step_crafting_state()
+function Runner:_step_craft_state()
     local craft_orders_completed = { }
+
+    -- insert one crafting item in the queue each step
 
     for _, craft_order in ipairs(self.pending_craft_orders) do
         local num_crafted = self.pending_craft_orders_num_crafted[craft_order]
         local craft_order_total = craft_order:get_count()
         local num_remaining = craft_order_total - num_crafted
-
-        for i = 1, num_remaining do
-            local num_started = self.player.begin_crafting( { count = 1, recipe = craft_order.recipe_name, silent = false })
-            
-            if num_started < 1 then 
-                break 
-            end
-
-            num_crafted = num_crafted + num_started
-        end
         
-        if num_crafted == craft_order_total then
-            craft_orders_completed[#craft_orders_completed] = craft_order
-        else
-            --game.print("[TAS] Runner: Can't craft " .. craft_order_count - num_actually_started_crafting .. " " .. craft_order.recipe_name .. ": not enough ingredients.")
+        local num_started = self.player.begin_crafting( { count = 1, recipe = craft_order.recipe_name, silent = false })
+        if num_started > 0 then
+            num_crafted = num_crafted + num_started
             self.pending_craft_orders_num_crafted[craft_order] = num_crafted
-        end
-    end
 
-    -- remove completed orders
-    for _, order in ipairs(craft_orders_completed) do
-        self.pending_craft_orders[order] = nil
-        self.pending_craft_orders_num_crafted[order] = nil
+            if num_crafted < craft_order_total then
+                return true
+            end
+            
+            -- mutating a list causes the next loop iteration to be undefined.
+            -- It is OK to mutate here because we are exiting the loop immediately.
+            self.pending_craft_orders_num_crafted[craft_order] = nil
+            self.pending_craft_orders[craft_order] = nil
+            return true
+        end
     end
 end
 
 function Runner:_should_move_to_next_waypoint()
-    local waypoint = self._get_next_waypoint()
+    local waypoint = self:_get_next_waypoint()
     if waypoint == nil then
         return false
     end
@@ -213,7 +219,7 @@ function Runner:_should_move_to_next_waypoint()
     end
 end
 
-function Runner.step()
+function Runner:step()
     local player = self.player
     
     if player == nil then
@@ -229,11 +235,15 @@ function Runner.step()
     local character = player.character -- may be nil!
     local waypoint = self:_get_current_waypoint()
 
-    local mouse_in_use = self:_step_mining_state()
+    local mouse_in_use = self:_step_mine_state()
 
     if mouse_in_use == false then
         -- check construction
         mouse_in_use = self:_step_build_state()
+    end
+
+    if mouse_in_use == false then
+        mouse_in_use = self:_step_craft_state()
     end
 
     -- walk towards waypoint
@@ -243,7 +253,7 @@ function Runner.step()
     while self:_should_move_to_next_waypoint() == true do
         
         self.waypoint_index = self.waypoint_index + 1
-        self._process_waypoint_orders(self._get_current_waypoint())
+        self:_process_waypoint_orders(self:_get_current_waypoint())
         self:_set_walking_state()
     end
 end
@@ -251,7 +261,7 @@ end
 --[Comment]
 -- Sets the player that this runner will control while stepping.
 function Runner:set_player(player)
-    if player ~= nil and if_valid(player) == false then
+    if player ~= nil and is_valid(player) == false then
         error()
     end
 

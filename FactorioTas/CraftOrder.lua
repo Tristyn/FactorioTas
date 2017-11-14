@@ -22,7 +22,7 @@ function CraftOrder.new(recipe_name, count)
 end
 
 function CraftOrder.new_from_template(template)
-    local new = util.assign_table({}, template)
+    local new = util.clone_table(template)
 
     CraftOrder.set_metatable(new)
 
@@ -30,7 +30,7 @@ function CraftOrder.new_from_template(template)
 end
 
 function CraftOrder:to_template()
-    local template = util.assign_table({}, self)
+    local template = util.clone_table(self)
     template.waypoint = nil
     return template
 end

@@ -40,7 +40,7 @@ function Sequence.new()
 end
 
 function Sequence.new_from_template(template)
-    local new = util.assign_table({}, template)
+    local new = util.clone_table(template)
 
     new.waypoints = { }
     new._on_changed_callbacks = { }
@@ -57,7 +57,7 @@ function Sequence.new_from_template(template)
 end
 
 function Sequence:to_template()
-    local template = util.assign_table({}, self)
+    local template = util.clone_table(self)
 
     template.waypoints = { }
     for index, waypoint in pairs(self.waypoints) do
@@ -74,25 +74,25 @@ function Sequence:set_index(index)
     self.index = index
 end
 
-function Sequence:insert_waypoint(insert_index, surface_name, position)
-    return self:_insert_waypoint(insert_index, surface_name, position)
+function Sequence:insert_waypoint(insert_index, surface_name, pos)
+    return self:_insert_waypoint(insert_index, surface_name, pos)
 end
 
 function Sequence:insert_waypoint_from_entity(insert_index, waypoint_entity)
     return self:_insert_waypoint(insert_index, waypoint_entity.surface.name, waypoint_entity.position, waypoint_entity)
 end
 
-function Sequence:_insert_waypoint(insert_index, surface_name, position, waypoint_entity)
+function Sequence:_insert_waypoint(insert_index, surface_name, pos, waypoint_entity)
     fail_if_missing(insert_index)
     fail_if_missing(surface_name)
-    fail_if_missing(position)
+    fail_if_missing(pos)
 
     if insert_index < 1 or insert_index > #self.waypoints + 1 then
         error("insert_index out of range")
     end
 
     local is_spawning_entity = is_valid(waypoint_entity) == false
-    local waypoint = Waypoint.new(surface_name, position, is_spawning_entity)
+    local waypoint = Waypoint.new(surface_name, pos, is_spawning_entity)
 
     table.insert(self.waypoints, insert_index, waypoint)
 

@@ -1,3 +1,6 @@
+local position = require("position")
+local mathex = require("mathex")
+
 constants = {
     -- Some of these constants can be read/written during data initialization phase.
     -- There is no way to know their value during game execution phase so they are stored here.
@@ -22,57 +25,9 @@ constants = {
 }
 
 util = { }
-math.point = { }
-math.rectangle = { }
 
 function util.init_globals()
     global.guid_count = 0
-end
-
--- Restricts a number to be within a specified range.
-function math.clamp(value, min, max)
-    return math.max(math.min(value, max), min)
-end
-
--- Calculate Euclidean distance in 2d.
-function math.pyth(point_a, point_b)
-    local distance_x = point_a.x - point_b.x
-    local distance_y = point_a.y - point_b.y
-
-    return math.sqrt(distance_x * distance_x + distance_y * distance_y)
-end
-
--- Computes the distance between a point and a rectangle.
--- If the point is inside the rectangle, the distance returned is 0.
--- Argument point is defines as { x = 3, y = 8 }
--- Argument rectangle is defined as {left_top = { x = -2, y = -3}, right_bottom = {x = 5, y = 8}}. See http://lua-api.factorio.com/latest/Concepts.html#BoundingBox
-function math.distance_rectangle_to_point(rectangle, point)
-    -- Get a position within the bounds of rectangle that is the nearest to point
-    -- When point is inside of rectangle, then rect_position will equal point
-    local rect_position =
-    {
-        x = math.clamp(point.x,rectangle.left_top.x,rectangle.right_bottom.x),
-        y = math.clamp(point.y,rectangle.left_top.y,rectangle.right_bottom.y)
-    }
-
-    return math.pyth(point, rect_position)
-end
-
--- Adds two points together
-function math.point.add(point_a, point_b)
-    return
-    {
-        x = point_a.x + point_b.x,
-        y = point_a.y + point_b.y
-    }
-end
-
-function math.rectangle.translate(rectangle, point_offset)
-    return
-    {
-        left_top = math.point.add(rectangle.left_top,point_offset),
-        right_bottom = math.point.add(rectangle.right_bottom,point_offset)
-    }
 end
 
 function util.get_guid()
@@ -104,7 +59,7 @@ function util.can_reach(player, entity_surface_name, entity_name, entity_positio
     -- it will always return true for entities such as ghost.
     
     local selection_box_world_space = math.rectangle.translate(game.entity_prototypes[entity_name].selection_box, entity_position)
-    local distance = math.distance_rectangle_to_point(selection_box_world_space, character.position)
+    local distance = bounding_box.distance_to_point(selection_box_world_space, character.position)
     local can_reach = distance < util.get_build_distance(character) - 0.5
     -- Include a 0.5 margin of error because this isn't the exact reach distance formula.
             
@@ -167,9 +122,9 @@ function util.get_directions(start, destination, walking_speed_per_tick)
     -- could be optimized by using a lookup table
 
     -- east & west
-    if util.equals(start.x, destination.x, walking_speed_per_tick) then
+    if mathex.float_equals(start.x, destination.x, walking_speed_per_tick) then
         -- north & south
-        if util.equals(start.y, destination.y, walking_speed_per_tick) then
+        if mathex.float_equals(start.y, destination.y, walking_speed_per_tick) then
             return nil
         elseif start.y < destination.y then
             return defines.direction.south
@@ -177,7 +132,7 @@ function util.get_directions(start, destination, walking_speed_per_tick)
             return defines.direction.north
         end
     elseif start.x < destination.x then
-        if util.equals(start.y, destination.y, walking_speed_per_tick) then
+        if mathex.float_equals(start.y, destination.y, walking_speed_per_tick) then
             return defines.direction.east
         elseif start.y < destination.y then
             return defines.direction.southeast
@@ -185,7 +140,7 @@ function util.get_directions(start, destination, walking_speed_per_tick)
             return defines.direction.northeast
         end
     else
-        if util.equals(start.y, destination.y, walking_speed_per_tick) then
+        if mathex.float_equals(start.y, destination.y, walking_speed_per_tick) then
             return defines.direction.west
         elseif start.y < destination.y then
             return defines.direction.southwest
@@ -193,10 +148,6 @@ function util.get_directions(start, destination, walking_speed_per_tick)
             return defines.direction.northwest
         end
     end
-end
-
-function util.equals(double1, double2, precision)
-    return math.abs(double1 - double2) <= precision
 end
 
 function util.integer_to_string(int)
@@ -506,13 +457,47 @@ function util.get_mining_time_and_durability_loss(miner_entity, minable_entity_n
     return time_in_ticks, durability_loss
 end
 
+function util.get_item_stack_split_count(click_event, item_name)
+    fail_if_missing(click_event)
+    fail_if_missing(item_name)
+
+    if click_event.button == defines.mouse_button_type.left  then
+        if click_event.shift == true then
+            return game.item_prototypes[item_name].stack_size
+        else
+            return 1
+        end
+    elseif click_event.button == defines.mouse_button_type.right then
+        return 5
+    else 
+        return 1
+    end
+end
+
+function util.alert(surface_name, pos)
+    fail_if_missing(surface_name)
+    fail_if_missing(pos)
+
+    local surface = game.surfaces[surface_name]
+    if surface == nil then return end
+
+    pos = position.floor(pos)
+    local text = surface.create_entity({ name = "flying-text", position = pos, text = "⬇"})
+    for _, player in pairs(game.connected_players) do 
+        player.add_alert(text, defines.alert_type.not_enough_construction_robots)
+    end
+end
+
 --[Comment]
 -- Spawns a character at the origin.
 -- parameter respawn:bool is optional; if true adds items given during respawn, 
 -- if false gives items during first spawn. Defaults to false.
 function util.spawn_character(respawn)
     local surface = game.surfaces["nauvis"]
-    local spawn_point = surface.find_non_colliding_position("player", { x=0, y=0}, 0, 1)
+    local spawn_point = global.true_spawn_position
+    if spawn_point == nil then
+        spawn_point = surface.find_non_colliding_position("player", { x=0, y=0}, 0, 1)
+    end
     fail_if_missing(spawn_point)
 
     local character = surface.create_entity { 
@@ -540,22 +525,13 @@ function util.spawn_character(respawn)
 
 end
 
---[Comment]
--- util.assign_table(target_table, source_table_1, source_table_2..)
--- The util.assign_table() method is used to copy the values of all enumerable properties from one or more source tables to a target table.
--- Returns the target_table.
--- target_table must be a table and not nil.
-function util.assign_table(target_table, ...)
-    fail_if_missing(target_table)
-    fail_if_missing(arg)
+function util.clone_table(source_table)
+    fail_if_missing(source_table)
     
-    for i=1, #arg do
-        local source_table = arg[i]
-        for source_key,source_value in pairs(source_table) do
-            
-            target_table[source_key] = source_value
+    local target_table = { }
 
-        end
+    for source_key, source_value in pairs(source_table) do
+        target_table[source_key] = source_value
     end
 
     return target_table

@@ -21,13 +21,22 @@ function tas.gui.init_player(player_index)
 
     gui.root = player.gui.left.add { type = "flow", direction = "vertical" }
     gui.editor_container = gui.root.add { type = "flow", direction = "vertical" }
-    gui.entity_container = gui.root.add { type = "flow", direction = "vertical" }
+    gui.entity_editor = {
+        container = gui.root.add { type = "flow", direction = "vertical" },
+        entity_inventory = {
+            selected_inventory_index = 1
+        },
+        character_inventory = {
+            selected_inventory_index = 1
+        }
+    }
     gui.waypoint_container = gui.root.add { type = "flow", direction = "vertical" }
+    gui.waypoint_editor = {
+        item_transfer_rows = { }
+    }
 
     -- Editor constructor
     gui.editor = gui.editor_container.add { type = "frame", direction = "vertical", caption = "TAS Editor" }
-    gui.entity_inventory = { }
-    gui.player_inventory = { }
 
     local playback = gui.editor.add { type = "flow", direction = "horizontal" }
     gui.playback = { }
@@ -80,42 +89,30 @@ function tas.gui.reset_waypoint_toggles(player_index)
     global.players[player_index].gui.waypoint_mode.caption = "insert waypoint"
 end
 
-function tas.gui.hide_entity_info(player_index)
+function tas.gui.hide_entity_editor(player_index)
     fail_if_missing(player_index)
 
     local gui = global.players[player_index].gui
 
-    if is_valid(gui.player_inventory.dropdown) then
-        tas.gui.unregister_dropdown_selection_changed_callbacks(gui.player_inventory.dropdown)
-    end
-
-    if is_valid(gui.entity_inventory.dropdown) then
-        tas.gui.unregister_dropdown_selection_changed_callbacks(gui.entity_inventory.dropdown)
-    end
-
-    if gui.entity ~= nil then
-        gui.entity.destroy()
-        gui.entity = nil
+    if gui.entity_editor.root ~= nil then
+        gui.entity_editor.container.clear()
     end
 end
 
-function tas.gui.show_entity_info(player_index, entity)
+function tas.gui.show_entity_editor(player_index, entity, character)
     fail_if_missing(player_index)
     fail_if_missing(entity)
 
-    local character_entity = game.players[player_index].character
-    local gui = global.players[player_index].gui
+    local entity_editor = global.players[player_index].gui.entity_editor
 
-    tas.gui.hide_entity_info(player_index)
+    tas.gui.hide_entity_editor(player_index)
 
-    gui.entity_info = {
-        surface_name = entity.surface.name,
-        position = entity.position,
-        name = entity.name }
+    -- store the arguments so the editor can be refreshed at any time
+    entity_editor.entity = entity
+    entity_editor.character = character
 
-    gui.entity = gui.entity_container.add { type = "frame", direction = "vertical", caption = entity.localised_name }
-
-
+    local container_frame = entity_editor.container.add { type = "frame", direction = "vertical" }
+    entity_editor.root = container_frame.add { type = "table", colspan = 1 }
 
     -- inventory transfer ui
     -- transfer mode button: stack/item
@@ -123,50 +120,52 @@ function tas.gui.show_entity_info(player_index, entity)
 
     -- Collect inventories
     local entity_inventories = util.entity.get_inventory_info(entity.type)
-    local player_inventories = util.entity.get_inventory_info(character_entity.type)
-    gui.entity_inventory.all_inventories = entity_inventories
-    gui.player_inventory.all_inventories = player_inventories
+    local character_inventories = util.entity.get_inventory_info(character.type)
+
     -- Inventory Transfer UI
-    if #entity_inventories > 0 and #player_inventories > 0 then
+    if #entity_inventories > 0 and #character_inventories > 0 and entity ~= character then
 
         local entity_inventory_names = { }
         for i = 1, #entity_inventories do
             entity_inventory_names[i] = entity_inventories[i].name
         end
-        local player_inventory_names = { }
-        for i = 1, #player_inventories do
-            player_inventory_names[i] = player_inventories[i].name
+        local character_inventory_names = { }
+        for i = 1, #character_inventories do
+            character_inventory_names[i] = character_inventories[i].name
         end
-
-        --- Ensure that the inventory dropdowns are not null and set to entity inventories
-        if entity_inventories[gui.entity_inventory.opened_inventory_index] == nil then
-            gui.entity_inventory.opened_inventory_index = 1
-        end
-        --
-        if player_inventories[gui.player_inventory.opened_inventory_index] == nil then
-            gui.player_inventory.opened_inventory_index = 1
-        end
-        ---
-
 
         -- Entity Inventory
 
-        gui.entity_inventory.dropdown = gui.entity.add { type = "drop-down", selected_index = gui.entity_inventory.opened_inventory_index, items = entity_inventory_names, name = util.get_guid() }
-        tas.gui.register_dropdown_selection_changed_callback(gui.entity_inventory.dropdown, tas.gui.handle_inventory_transfer_dropdown_changed)
+        local entity_inventory = entity.get_inventory(entity_editor.entity_inventory.selected_inventory_index)
+        if entity_inventory == nil then 
+            entity_editor.entity_inventory.selected_inventory_index = entity_inventories[1].id
+            entity_inventory = entity.get_inventory(entity_inventories[1].id)
+        end
+        entity_editor.entity_inventory.dropdown = entity_editor.root.add { type = "drop-down", selected_index = entity_editor.entity_inventory.selected_inventory_index, items = entity_inventory_names, name = util.get_guid() }
+        tas.gui.register_dropdown_selection_changed_callback(entity_editor.entity_inventory.dropdown, tas.gui.handle_inventory_transfer_dropdown_changed)
+        if entity_inventory.is_empty() == true then
+            entity_editor.root.add { type = "label", caption = "empty" }
+        else
+            tas.gui.build_inventory_grid_control(entity_editor.root, entity_inventory, "item/", tas.gui.entity_info_transfer_inventory_clicked_callback)
+        end
+        
+        -- Character Inventory
 
-        gui.entity_inventory.inventory_grid_container = gui.entity.add { type = "flow" }
-        tas.gui.show_entity_info_transfer_inventory(player_index, gui.entity_inventory)
-
-        -- Player Inventory
-
-        gui.player_inventory.dropdown = gui.entity.add { type = "drop-down", selected_index = gui.player_inventory.opened_inventory_index, items = player_inventory_names, name = util.get_guid() }
-        tas.gui.register_dropdown_selection_changed_callback(gui.player_inventory.dropdown,  tas.gui.handle_inventory_transfer_dropdown_changed)
-
-        gui.player_inventory.inventory_grid_container = gui.entity.add { type = "flow" }
-        tas.gui.show_entity_info_transfer_inventory(player_index, gui.player_inventory)
-
+        local character_inventory = character.get_inventory(entity_editor.character_inventory.selected_inventory_index)
+        if character_inventory == nil then 
+            entity_editor.character_inventory.selected_inventory_index = character_inventories[1].id
+            character_inventory = character.get_inventory(character_inventories[1].id)
+        end
+        entity_editor.character_inventory.dropdown = entity_editor.root.add { type = "drop-down", selected_index = entity_editor.character_inventory.selected_inventory_index, items = character_inventory_names, name = util.get_guid() }
+        tas.gui.register_dropdown_selection_changed_callback(entity_editor.character_inventory.dropdown,  tas.gui.handle_inventory_transfer_dropdown_changed)
+        if character_inventory.is_empty() == true then
+            entity_editor.root.add { type = "label", caption = "empty" }
+        else
+            tas.gui.build_inventory_grid_control(entity_editor.root, character_inventory, "item/", tas.gui.entity_info_transfer_inventory_clicked_callback)
+        end
     end
 
+    
     -- entity mine order
     if entity.minable == true and entity.type ~= "resource" then
 
@@ -178,7 +177,7 @@ function tas.gui.show_entity_info(player_index, entity)
             end
         end
 
-        local mine = gui.entity.add { type = "checkbox", caption = "mine", state = mine_order_exists, name = util.get_guid() }
+        local mine = entity_editor.root.add { type = "checkbox", caption = "mine", state = mine_order_exists, name = util.get_guid() }
         tas.gui.register_check_changed_callback(mine, function()
             if mine.state == true then
                 tas.add_mine_order(player_index, entity)
@@ -190,73 +189,52 @@ function tas.gui.show_entity_info(player_index, entity)
             end
         end )
     end
+
 end
 
 function tas.gui.handle_inventory_transfer_dropdown_changed(dropdown_element, player_index)
     local inventory_viewmodel = nil
-    local gui = global.players[player_index].gui
+    local entity = nil
+    local entity_editor = global.players[player_index].gui.entity_editor
 
-
-    if gui.player_inventory.dropdown == dropdown_element then
-        inventory_viewmodel = gui.player_inventory
-    elseif gui.entity_inventory.dropdown == dropdown_element then
-        inventory_viewmodel = gui.entity_inventory
+    if entity_editor.character_inventory.dropdown == dropdown_element then
+        inventory_viewmodel = entity_editor.character_inventory
+        entity = entity_editor.character
+    elseif entity_editor.entity_inventory.dropdown == dropdown_element then
+        inventory_viewmodel = entity_editor.entity_inventory
+        entity = entity_editor.entity
     else
         error()
     end
 
-    
-    inventory_viewmodel.opened_inventory_index = inventory_viewmodel.dropdown.selected_index
-    tas.gui.show_entity_info_transfer_inventory(player_index, inventory_viewmodel)
-end
+    local inventories = util.entity.get_inventory_info(entity.type)
+    inventory_viewmodel.selected_inventory_index = inventories[inventory_viewmodel.dropdown.selected_index].id
 
-function tas.gui.show_entity_info_transfer_inventory(player_index, inventory_viewmodel)
-    local inventory_index = inventory_viewmodel.opened_inventory_index
-    local inventory_info = inventory_viewmodel.all_inventories[inventory_index]
-    local inventory = inventory_viewmodel.entity.get_inventory(inventory_info.id)
-
-    --- 0.15 Impl
-    -- gui.entity_inventory.dropdown = gui.entity.add { type = "drop-down", inventory_viewmodel.inventory_grid_container, items = entity_inventory_names, name = util.get_guid() }
-    -- tas.gui.register_dropdown_selection_changed_callback(gui.entity_inventory.dropdown, function(event, player_index) tas.gui.entity_current_inventory_dropdown_changed_callback(player_index, gui.entity_inventory) end)
-
-    
-    inventory_viewmodel.inventory_grid_container.clear()
-    tas.gui.build_inventory_grid_control(inventory_viewmodel.inventory_grid_container, inventory, "item/", tas.gui.entity_info_transfer_inventory_clicked_callback)
+    tas.gui.refresh(player_index)
 end
 
 function tas.gui.entity_info_transfer_inventory_clicked_callback(event)
     -- event = { gui_element, player_index, inventory, item_stack, item_stack_index }
     local click_event = event.click_event
     local player_index = click_event.player_index
-    local player_entity = game.players[player_index]
     local inventory = event.inventory
     local item_stack = event.item_stack
     local item_stack_index = event.item_stack_index
-    local gui = global.players[player_index].gui
+    local entity_editor = global.players[player_index].gui.entity_editor
+    local character = entity_editor.character
+    local entity = entity_editor.entity
 
-    local inventory_owner = util.get_inventory_owner(inventory)
-    local is_player_receiving = inventory_owner ~= player_entity and inventory_owner ~= player_entity.character
+    local character_inventory = character.get_inventory(entity_editor.character_inventory.selected_inventory_index)
+    local entity_inventory = entity.get_inventory(entity_editor.entity_inventory.selected_inventory_index)
 
-    local item_stack_count = 1
-    if click_event.button == defines.mouse_button_type.left and click_event.shift then
-        item_stack_count = game.item_prototypes[item_stack.name].stack_size
-    elseif click_event.button == defines.mouse_button_type.right then
-        item_stack_count = 5
-    end
 
-    tas.gui.new_item_transfer_order(player_index, gui.entity_inventory, gui.player_inventory, is_player_receiving, { name = item_stack.name, count = item_stack_count })
-end
+    local is_player_receiving = util.get_inventory_owner(inventory) == entity
 
-function tas.gui.new_item_transfer_order(player_index, entity_inventory_viewmodel, player_inventory_viewmodel, is_player_receiving, items_to_transfer)
-    if game.players[player_index].character ~= player_inventory_viewmodel.entity then
-        error("player index and character entity don't match")
-    end
+    local item_stack_count = util.get_item_stack_split_count(click_event, item_stack.name)
 
-    local entity_inventory = entity_inventory_viewmodel.entity.get_inventory(entity_inventory_viewmodel.all_inventories[entity_inventory_viewmodel.opened_inventory_index].id)
-    local player_inventory = player_inventory_viewmodel.entity.get_inventory(player_inventory_viewmodel.all_inventories[player_inventory_viewmodel.opened_inventory_index].id)
-
-    tas.add_item_transfer_order(player_index, is_player_receiving, player_inventory, entity_inventory_viewmodel.entity, entity_inventory, items_to_transfer)
-
+    local items = { name = item_stack.name, count = item_stack_count }
+    tas.add_item_transfer_order(player_index, is_player_receiving, character_inventory, entity_inventory, items)
+    tas.gui.refresh(player_index)
 end
 
 function tas.gui.hide_waypoint_info(player_index)
@@ -265,7 +243,7 @@ function tas.gui.hide_waypoint_info(player_index)
     local gui = global.players[player_index].gui
 
     if gui.waypoint ~= nil then
-        gui.waypoint.destroy()
+        gui.waypoint_container.clear()
         gui.waypoint = nil
     end
 end
@@ -277,14 +255,8 @@ function tas.gui.crafting_queue_item_clicked_callback(event)
     local craft_order = waypoint.craft_orders[event.item_stack_index]
    
 
-    local items_to_remove = 1
-    if click_event.button == defines.mouse_button_type.left and click_event.shift then
-        items_to_remove = game.item_prototypes[event.item_stack.name].stack_size
-    elseif click_event.button == defines.mouse_button_type.right then
-        items_to_remove = 5
-    end
+    local items_to_remove = util.get_item_stack_split_count(event, craft_order.item_name)
 
-    
     if craft_order:get_count() > items_to_remove then
         craft_order:set_count(craft_order:get_count() - items_to_remove)
     else
@@ -305,8 +277,9 @@ function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index
     local gui = global.players[player_index].gui
     gui.sequence_index = sequence_index
     gui.waypoint_index = waypoint_index
-    gui.waypoint = gui.waypoint_container.add { type = "frame", direction = "vertical", caption = "Waypoint # " .. waypoint_index }
-
+    local container_frame = gui.waypoint_container.add { type = "frame", direction = "vertical", caption = "Waypoint # " .. waypoint_index }
+    gui.waypoint = container_frame.add { type = "table", colspan = 1}
+    
     -- delay
 
     -- mine orders targeted at resources
@@ -355,14 +328,65 @@ function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index
 
     -- item transfer orders
     do
+
+        if #waypoint.item_transfer_orders > 0 then
+            gui.waypoint.add{type ="label", caption = "item transfers" }
+        end
+        
+        local item_transfer_table = gui.waypoint.add { type = "table", colspan = 5 }
+        local item_transfer_rows = { }
+
         for i, order in ipairs(waypoint.item_transfer_orders) do
+            local item_transfer_row = { order = order }
+            table.insert(item_transfer_rows, item_transfer_row)
 
-            gui.waypoint.add { type = "label", caption = { "TAS-item-transfer-order-description", order.container_entity.name, order.container_entity.position.x, order.container_entity.position.y } }
-            tas.gui.build_inventory_grid_control(gui.waypoint, { order.item_stack }, "item/", nil)
+            local transfer_direction_sprite = nil
+            if order.is_player_receiving == true then
+                transfer_direction_sprite = "tas-arrow-right"
+            else
+                transfer_direction_sprite = "tas-arrow-left"
+            end
 
+            item_transfer_row.reveal_entity_button = tas.gui.build_inventory_item_control(item_transfer_table, { name = order.container_name, count = 0 } , "entity/")
+            item_transfer_table.add { type = "sprite", sprite = transfer_direction_sprite}
+            item_transfer_row.increment_button = tas.gui.build_inventory_item_control(item_transfer_table, order.item_stack, "item/")
+            item_transfer_row.decrement_button = item_transfer_table.add { type = "sprite-button", sprite = "tas-decrement", style = "button-style"}
+            item_transfer_row.remove_button = item_transfer_table.add { type = "sprite-button", sprite = "tas-cancel", style = "button-style"}
         end
 
+        gui.waypoint_editor.item_transfer_rows = item_transfer_rows
+
     end
+end
+
+function tas.gui.try_handle_waypoint_editor_item_transfer_clicked(event)
+
+    local button = event.element
+    local waypoint_editor = global.players[event.player_index].gui.waypoint_editor
+
+    for k, row in ipairs(waypoint_editor.item_transfer_rows) do
+        if button == row.reveal_entity_button then
+            util.alert(row.order.container_surface_name, row.order.container_position)
+            return true
+        elseif button == row.increment_button then
+            local num_to_add = util.get_item_stack_split_count(event, row.order.item_stack.name)
+            row.order:set_count(row.order:get_count() + num_to_add)
+            tas.gui.refresh(event.player_index)
+            return true
+        elseif button == row.decrement_button then
+            local num_to_remove = util.get_item_stack_split_count(event, row.order.item_stack.name)
+            local new_count = math.max(row.order:get_count() - num_to_remove, 1)
+            row.order:set_count(new_count)
+            tas.gui.refresh(event.player_index)
+            return true
+        elseif button == row.remove_button then
+            row.order.waypoint:remove_item_transfer_order(row.order.index)
+            tas.gui.refresh(event.player_index)
+            return true
+        end
+    end
+
+    return false
 end
 
 -- Transforms a collection of craft_orders to a collection of SimpleItemStack
@@ -372,11 +396,6 @@ function tas.gui.craft_orders_to_inventory(craft_orders)
     local inventory_index = 1
 
     for i, craft_order in ipairs(craft_orders) do
-        --[[
-        if #inventory > 0 and craft_order.name == inventory[#inventory].name then
-            -- fast-path, merge with the top item stack
-        end
-        --]]
 
         local simple_item_stack = { name = craft_order.recipe_name, count = craft_order:get_count() }
         table.insert(inventory, simple_item_stack)
@@ -389,23 +408,15 @@ end
 -- on_item_stack_clicked_callback accepts a table with the fields { gui_element, player_index, inventory, item_stack, item_stack_index }
 -- returns the root flow container elemnt for the inventory
 function tas.gui.build_inventory_grid_control(container_frame, inventory, sprite_path_prefix, on_item_stack_clicked_callback)
-    local num_columns = 10
-    local inventory_container = container_frame.add { type = "flow", direction = "vertical" }
-    local inventory_row
+    local inventory_container = container_frame.add { type = "table", colspan = 10 }
 
-    -- item_stack is SimpleItemStack. See http://lua-api.factorio.com/latest/Concepts.html#SimpleItemStack
+    -- item_stack is SimpleItemStack or LuaItemStack. See http://lua-api.factorio.com/latest/Concepts.html#SimpleItemStack
     
     for i = 1, #inventory do
         local item_stack = inventory[i]
         if item_stack.valid_for_read == nil or item_stack.valid_for_read == true then
 
-            -- add a new row every n columns
-            if i % num_columns == 1 then
-                inventory_row = inventory_container.add { type = "flow", direction = "horizontal" }
-            end
-
-            local btn = inventory_row.add( { type = "sprite-button", sprite = sprite_path_prefix .. item_stack.name, style = "button-style", name = util.get_guid() })
-            btn.add( { type = "label", caption = tostring(item_stack.count) })
+            local btn = tas.gui.build_inventory_item_control(inventory_container, item_stack, sprite_path_prefix)
 
             if on_item_stack_clicked_callback ~= nil then
                 tas.gui.register_click_callback(btn, function(event)
@@ -417,6 +428,14 @@ function tas.gui.build_inventory_grid_control(container_frame, inventory, sprite
     end
 
     return inventory_container
+end
+
+function tas.gui.build_inventory_item_control(container, item_stack, sprite_path_prefix)
+    local btn = container.add( { type = "sprite-button", sprite = sprite_path_prefix .. item_stack.name, style = "button-style", name = util.get_guid() })
+    if item_stack.count > 0 then
+        btn.add( { type = "label", caption = tostring(item_stack.count) })
+    end
+    return btn
 end
 
 function tas.gui.mine_order_info_to_localised_string(mine_order)
@@ -445,11 +464,9 @@ function tas.gui.refresh(player_index)
         tas.gui.show_waypoint_info(player_index, gui.sequence_index, gui.waypoint_index)
     end
 
-    if gui.entity_info ~= nil then
-        local entity_object = util.find_entity(gui.entity_info.surface_name, gui.entity_info.name, gui.entity_info.position)
-        if is_valid(entity_object) then
-            tas.gui.show_entity_info(player_index, entity_object)
-        end
+    local entity_editor = gui.entity_editor
+    if entity_editor.root ~= nil then
+        tas.gui.show_entity_editor(player_index, entity_editor.entity, entity_editor.character)
     end
 end
 
@@ -576,6 +593,8 @@ function tas.gui.on_click(event)
         if num_ticks ~= nil then
             global.playback_controller:play(player, num_ticks)
         end
+    elseif tas.gui.try_handle_waypoint_editor_item_transfer_clicked(event) == true then
+        -- handled
     end
 end
 

@@ -51,9 +51,11 @@ function tas.on_player_created(event)
         hover_arrows = { }
     }
 
+    tas.ensure_true_spawn_position_set(game.players[player_index])
+
     --  select the first waypoint if any exist
     if #global.sequence_indexer.sequences > 0 then
-        global.players[player_index].waypoint = global.sequence_indexer.sequences[1].waypoints[1]
+        tas.select_waypoint(global.sequence_indexer.sequences[1].waypoints[1])
     end
 
     tas.gui.init_player(player_index)
@@ -167,6 +169,18 @@ function tas.destroy_arrow(arrow_facade)
         arrow_facade.beam.destroy()
     end
 
+end
+
+function tas.ensure_true_spawn_position_set(freshly_spawned_player)
+    -- The spawn point for nauvis is 0,0 (or closest land to it)
+    -- LuaForce::get_spawn_point doesn't help, it always returns 0,0 even if it is over water
+    -- LuaSurface::find_non_colliding_position isn't accurate when precision is set to 1.0
+    -- The best solution I found is to store the exact position of a player when they spawn for the first time.
+    -- Note the stored position becomes innacurate if the player landfills over a watery spawn.
+
+    if global.true_spawn_position == nil then
+        global.true_spawn_position = freshly_spawned_player.position
+    end
 end
 
 -- [Comment]
@@ -517,10 +531,13 @@ function tas.on_pre_mined_entity(event)
 
 end
 
-function tas.add_item_transfer_order(player_index, is_player_receiving, player_inventory, container_entity, container_inventory, items_to_transfer)
-    local player = game.players[player_index]
+function tas.add_item_transfer_order(player_index, is_player_receiving, character_inventory, container_inventory, items_to_transfer)
+    if tas.is_waypoint_selected(player_index) == false then
+        return false
+    end
     
-    player.waypoint:add_item_transfer_order(is_player_receiving, player_inventory, container_inventory, items_to_transfer)
+    local waypoint = global.players[player_index].waypoint
+    waypoint:add_item_transfer_order(is_player_receiving, character_inventory, container_inventory, items_to_transfer)
 end
 
 function tas.destroy_item_transfer_order(item_transfer_order)
@@ -582,6 +599,16 @@ function tas.on_clicked_ghost(player_index, ghost_entity)
     tas.select_waypoint(player_index, build_order_indexes.waypoint)
 end
 
+function tas.on_clicked_generic_entity(player_index, entity)
+    if tas.is_waypoint_selected(player_index)  == false then
+        return
+    end
+    local sequence = global.players[player_index].waypoint.sequence
+    local character = global.playback_controller:try_get_character(sequence)
+    tas.gui.show_entity_editor(player_index, entity, character)
+
+end
+
 function tas.on_left_click(event)
     local player_index = event.player_index
     local player = game.players[player_index]
@@ -596,7 +623,7 @@ function tas.on_left_click(event)
     elseif entity_name == "entity-ghost" then
         tas.on_clicked_ghost(player_index, entity)
     else
-        tas.gui.show_entity_info(player_index, entity)
+        tas.on_clicked_generic_entity(player_index, entity)
     end
 end
 

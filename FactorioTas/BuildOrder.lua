@@ -32,8 +32,8 @@ function BuildOrder.new_from_ghost_entity(ghost_entity)
 end
 
 function BuildOrder.new_from_template(template)
-    local new = util.assign_table({}, template)
-    new.position = util.assign_table({}, template.position)
+    local new = util.clone_table(template)
+    new.position = util.clone_table(template.position)
 
     BuildOrder.set_metatable(new)
 
@@ -43,8 +43,8 @@ function BuildOrder.new_from_template(template)
 end
 
 function BuildOrder:to_template()
-    local template = util.assign_table({}, self)
-    template.position = util.assign_table({}, self.position)
+    local template = util.clone_table(self)
+    template.position = util.clone_table(self.position)
     template.waypoint = nil
     return template
 end
