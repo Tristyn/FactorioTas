@@ -1,7 +1,8 @@
 -- extends lua exported table `math`
 -- Bounding Box format see: http://lua-api.factorio.com/latest/Concepts.html#BoundingBox
 
-require("position")
+local position = require("position")
+local mathex = require("mathex")
 
 local bounding_box = { }
 
@@ -14,8 +15,8 @@ function bounding_box.distance_to_point(rectangle, point)
     -- When point is inside of rectangle, then rect_position will equal point
     local rect_position =
     {
-        x = math.clamp(point.x,rectangle.left_top.x,rectangle.right_bottom.x),
-        y = math.clamp(point.y,rectangle.left_top.y,rectangle.right_bottom.y)
+        x = mathex.clamp(point.x,rectangle.left_top.x,rectangle.right_bottom.x),
+        y = mathex.clamp(point.y,rectangle.left_top.y,rectangle.right_bottom.y)
     }
 
     return position.distance(point, rect_position)

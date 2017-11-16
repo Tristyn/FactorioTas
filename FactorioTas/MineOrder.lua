@@ -56,8 +56,8 @@ function MineOrder:get_entity()
 	return util.find_entity(self.surface_name, self.name, self.position)
 end
 
-function MineOrder:can_reach(character)
-	return util.can_reach(character, self.surface_name, self.name, self.position)
+function MineOrder:can_reach(player)
+	return util.can_reach(player, self.surface_name, self.name, self.position)
 end
 
 function MineOrder:can_set_count()
@@ -68,7 +68,7 @@ function MineOrder:set_count(value)
 	if value < 1 then
 		error()
 	end
-	if self:can_set_count() == false then
+	if value > 1 and self:can_set_count() == false then
 		error("Setting a count is only valid for entities of type 'resource'")
 	end
 
@@ -107,7 +107,7 @@ function MineOrder:has_sufficient_tool_durability(character)
 	local max_durability_per_tool = game.item_prototypes[tool_stack.name].durability
 	local durability_total = (tool_stack.count - 1) * max_durability_per_tool + tool_stack.durability
 
-	local needed_durability = self.get_tool_durability_loss(character)
+	local needed_durability = self:get_tool_durability_loss(character)
 	
 	return durability_total >= needed_durability
 end
@@ -117,7 +117,7 @@ end
 function MineOrder:remove_durability(character)
 	fail_if_missing(character)
 	
-	local remaining_loss = self.get_tool_durability_loss(character)
+	local remaining_loss = self:get_tool_durability_loss(character)
 	local tool_stack = character.get_inventory(defines.inventory.player_tools)[1]
 	local max_durability_per_tool = game.item_prototypes[tool_stack.name].durability
 
@@ -162,10 +162,10 @@ function MineOrder:can_mine(miner_entity)
 		fail_if_invalid(miner_entity)
 
 		if miner_entity.type == "player" then
-			if self.can_reach(miner_entity) == false then
+			if self:can_reach(miner_entity.player) == false then
 				return false
 			end
-			if self.has_sufficient_tool_durability(miner_entity) == false then
+			if self:has_sufficient_tool_durability(miner_entity) == false then
 				return false
 			end
 		end
@@ -179,12 +179,14 @@ end
 -- successful and there was inventory space.
 function MineOrder:mine(character)
 	
-	if self.can_mine(character) == false then 
+	if self:can_mine(character) == false then 
 		return false
 	end
 
 	-- no support for character.mine_tile yet
-	return character.mine_entity(self.get_entity())
+	local entity = self:get_entity()
+	character.update_selected_entity(entity.position)
+	return character.mine_entity(entity)
 end
 
 return MineOrder

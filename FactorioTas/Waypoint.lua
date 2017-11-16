@@ -269,9 +269,9 @@ function Waypoint:remove_craft_order(index)
 	self:_remove_order(self.craft_orders, index)
 end
 
-function Waypoint:add_item_transfer_order(is_player_receiving, player_inventory, container_inventory, items_to_transfer)
+function Waypoint:add_item_transfer_order(is_player_receiving, player_inventory_index, container_entity, container_inventory_index, items_to_transfer)
 	
-	local order = ItemTransferOrder.new(is_player_receiving, player_inventory, container_inventory, items_to_transfer)
+	local order = ItemTransferOrder.new(is_player_receiving, player_inventory, container_entity, container_inventory_index,, items_to_transfer)
 
 	-- If we can't merge the order, then append it
 	

@@ -531,13 +531,13 @@ function tas.on_pre_mined_entity(event)
 
 end
 
-function tas.add_item_transfer_order(player_index, is_player_receiving, character_inventory, container_inventory, items_to_transfer)
+function tas.add_item_transfer_order(player_index, is_player_receiving, container_entity, container_inventory_index, items_to_transfer)
     if tas.is_waypoint_selected(player_index) == false then
         return false
     end
     
     local waypoint = global.players[player_index].waypoint
-    waypoint:add_item_transfer_order(is_player_receiving, character_inventory, container_inventory, items_to_transfer)
+    waypoint:add_item_transfer_order(is_player_receiving, character_inventory, container_entity, container_inventory_index, items_to_transfer)
 end
 
 function tas.destroy_item_transfer_order(item_transfer_order)
@@ -552,6 +552,10 @@ function tas.on_crafted_item(event)
     local player_entity = game.players[player_index]
 
     if global.playback_controller:get_current_playback_player() == player_entity then
+        return
+    end
+
+    if tas.is_waypoint_selected(player_index) == false then
         return
     end
 
@@ -592,21 +596,29 @@ function tas.on_clicked_waypoint(player_index, waypoint_entity)
 end
 
 function tas.on_clicked_ghost(player_index, ghost_entity)
-    local build_order_indexes = tas.find_build_order_from_entity(ghost_entity)
-
-    if build_order_indexes == nil then return end
-
-    tas.select_waypoint(player_index, build_order_indexes.waypoint)
+    if tas.is_waypoint_selected(player_index) == false then
+        local build_order_indexes = tas.find_build_order_from_entity(ghost_entity)
+        if build_order_indexes == nil then 
+            game.print("no build order") 
+            return 
+        end
+        tas.select_waypoint(player_index, build_order_indexes.waypoint)
+    end
+    tas.show_entity_editor(player_index, ghost_entity)
 end
 
 function tas.on_clicked_generic_entity(player_index, entity)
+    tas.show_entity_editor(player_index, entity)
+end
+
+function tas.show_entity_editor(player_index, entity)
     if tas.is_waypoint_selected(player_index)  == false then
         return
     end
+
     local sequence = global.players[player_index].waypoint.sequence
     local character = global.playback_controller:try_get_character(sequence)
     tas.gui.show_entity_editor(player_index, entity, character)
-
 end
 
 function tas.on_left_click(event)
@@ -796,7 +808,6 @@ function tas.on_sequence_changed(event)
             if player.waypoint == event.waypoint then
                 -- select a new waypoint
                 local waypoints = event.sender.waypoints
-                game.print(math.min(event.waypoint.index, #waypoints))
                 local selected_waypoint = waypoints[math.min(event.waypoint.index, #waypoints)]
                 tas.select_waypoint(index, selected_waypoint)
             end

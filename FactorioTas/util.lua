@@ -1,4 +1,5 @@
 local position = require("position")
+local bounding_box = require("bounding_box")
 local mathex = require("mathex")
 
 constants = {
@@ -58,7 +59,7 @@ function util.can_reach(player, entity_surface_name, entity_name, entity_positio
     -- The function character.can_reach_entity() is off limits because
     -- it will always return true for entities such as ghost.
     
-    local selection_box_world_space = math.rectangle.translate(game.entity_prototypes[entity_name].selection_box, entity_position)
+    local selection_box_world_space = bounding_box.translate(game.entity_prototypes[entity_name].selection_box, entity_position)
     local distance = bounding_box.distance_to_point(selection_box_world_space, character.position)
     local can_reach = distance < util.get_build_distance(character) - 0.5
     -- Include a 0.5 margin of error because this isn't the exact reach distance formula.
@@ -419,15 +420,15 @@ function util.get_mining_time_and_durability_loss(miner_entity, minable_entity_n
     -- Mining time / ((Mining power - Mining hardness) * Mining speed) = ticks for 1 product
 
     fail_if_missing(miner_entity)
-    fail_if_missing(minable_entity)
+    fail_if_missing(minable_entity_name)
 
     local miner_prototype = game.entity_prototypes[miner_entity.name]
     local minable_prototype = game.entity_prototypes[minable_entity_name]
 
     local mining_power = miner_prototype.mining_power
     local mining_speed = miner_prototype.mining_speed
-    local mining_hardness = minable_prototype.minable_properties.hardness
-    local mining_time = minable_prototype.minable_properties.mining_time
+    local mining_hardness = minable_prototype.mineable_properties.hardness
+    local mining_time = minable_prototype.mineable_properties.mining_time
     
     if mining_power == nil then
         -- default mining power is nil when entity type is not `mining_drill` and is `player`

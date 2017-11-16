@@ -126,7 +126,7 @@ function BuildOrder:can_spawn_entity()
         name = self.name,
         position = self.position,
         direction = self.direction,
-        force = character.force
+        force = self.force_name
     } )
 end
 
@@ -150,7 +150,7 @@ function BuildOrder:_find_item_stack(player)
         return stack
     end
 
-    return util.find_item_stack(player, get_player_inventories(player), self.item_name)
+    return util.find_item_stack(player, util.get_player_inventories(player), self.item_name)
 end
 
 function BuildOrder:is_order_item_in_cursor_stack(player)

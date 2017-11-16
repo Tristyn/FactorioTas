@@ -104,6 +104,12 @@ function tas.gui.show_entity_editor(player_index, entity, character)
     fail_if_missing(entity)
 
     local entity_editor = global.players[player_index].gui.entity_editor
+    local entity_type = nil
+    if entity.type ~= "entity-ghost" then
+        entity_type = entity.type
+    else
+        entity_type = entity.ghost_type
+    end
 
     tas.gui.hide_entity_editor(player_index)
 
@@ -119,7 +125,7 @@ function tas.gui.show_entity_editor(player_index, entity, character)
     -- creates inventory transfer orders in the waypoint
 
     -- Collect inventories
-    local entity_inventories = util.entity.get_inventory_info(entity.type)
+    local entity_inventories = util.entity.get_inventory_info(entity_type)
     local character_inventories = util.entity.get_inventory_info(character.type)
 
     -- Inventory Transfer UI
@@ -143,7 +149,9 @@ function tas.gui.show_entity_editor(player_index, entity, character)
         end
         entity_editor.entity_inventory.dropdown = entity_editor.root.add { type = "drop-down", selected_index = entity_editor.entity_inventory.selected_inventory_index, items = entity_inventory_names, name = util.get_guid() }
         tas.gui.register_dropdown_selection_changed_callback(entity_editor.entity_inventory.dropdown, tas.gui.handle_inventory_transfer_dropdown_changed)
-        if entity_inventory.is_empty() == true then
+        if entity.type == "entity-ghost" then
+            entity_editor.root.add { type = "label", caption = "ghost inventory inaccessible" }
+        elseif entity_inventory == nil or entity_inventory.is_empty() == true then
             entity_editor.root.add { type = "label", caption = "empty" }
         else
             tas.gui.build_inventory_grid_control(entity_editor.root, entity_inventory, "item/", tas.gui.entity_info_transfer_inventory_clicked_callback)
@@ -224,8 +232,8 @@ function tas.gui.entity_info_transfer_inventory_clicked_callback(event)
     local character = entity_editor.character
     local entity = entity_editor.entity
 
-    local character_inventory = character.get_inventory(entity_editor.character_inventory.selected_inventory_index)
-    local entity_inventory = entity.get_inventory(entity_editor.entity_inventory.selected_inventory_index)
+    local character_inventory_index = entity_editor.character_inventory.selected_inventory_index
+    local entity_inventory_index = entity_editor.entity_inventory.selected_inventory_index
 
 
     local is_player_receiving = util.get_inventory_owner(inventory) == entity
@@ -233,7 +241,7 @@ function tas.gui.entity_info_transfer_inventory_clicked_callback(event)
     local item_stack_count = util.get_item_stack_split_count(click_event, item_stack.name)
 
     local items = { name = item_stack.name, count = item_stack_count }
-    tas.add_item_transfer_order(player_index, is_player_receiving, character_inventory, entity_inventory, items)
+    tas.add_item_transfer_order(player_index, is_player_receiving, character_inventory_index, entity,entity_inventory_index, items)
     tas.gui.refresh(player_index)
 end
 
@@ -255,7 +263,7 @@ function tas.gui.crafting_queue_item_clicked_callback(event)
     local craft_order = waypoint.craft_orders[event.item_stack_index]
    
 
-    local items_to_remove = util.get_item_stack_split_count(event, craft_order.item_name)
+    local items_to_remove = util.get_item_stack_split_count(event, craft_order.recipe_name)
 
     if craft_order:get_count() > items_to_remove then
         craft_order:set_count(craft_order:get_count() - items_to_remove)
@@ -465,7 +473,7 @@ function tas.gui.refresh(player_index)
     end
 
     local entity_editor = gui.entity_editor
-    if entity_editor.root ~= nil then
+    if entity_editor.root ~= nil and is_valid(entity_editor.entity) and is_valid(entity_editor.character) then
         tas.gui.show_entity_editor(player_index, entity_editor.entity, entity_editor.character)
     end
 end
