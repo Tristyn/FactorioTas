@@ -158,7 +158,7 @@ function Sequence:on_changed(func)
     fail_if_missing(func)
 
     if self._on_changed_callbacks[func] ~= nil then
-        --error("Function reference was not unique. Consider using util.function_delegate(func)")
+        --error("Function reference was not unique. Consider using Delegate")
         error()
     end
 

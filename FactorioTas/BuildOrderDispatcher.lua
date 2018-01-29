@@ -1,5 +1,8 @@
+local mt = require("persistent_mt")
+
 local BuildOrderDispatcher = { }
 local metatable = { __index = BuildOrderDispatcher }
+mt.init(BuildOrderDispatcher, "BuildOrderDispatcher", metatable)
 
 BuildOrderDispatcher.execution_progress = {
 	tick_1_set_cursor_stack = 1,
@@ -10,7 +13,7 @@ BuildOrderDispatcher.execution_progress = {
 function BuildOrderDispatcher.set_metatable(instance)
 	if getmetatable(instance) ~= nil then return end
 
-	setmetatable(instance, metatable)
+	mt.bless(instance, metatable)
 end
 
 function BuildOrderDispatcher.new()

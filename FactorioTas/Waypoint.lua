@@ -2,6 +2,18 @@ local BuildOrder = require("BuildOrder")
 local MineOrder = require("MineOrder")
 local CraftOrder = require("CraftOrder")
 local ItemTransferOrder = require("ItemTransferOrder")
+local Event = require("Event")
+local Template = require("Template")
+
+--- Waypoint.changed event:
+-- This event is invoked every time any order is added or removed or the waypoint position and surface changes.
+-- Parameters
+-- sender :: The waypoint that triggered the callback.
+-- type :: string: Can be any of [moved]
+-- Additional type specific parameters:
+-- -- moved
+-- -- -- old_surface_name :: string
+-- -- -- old_position :: table: {x , y}
 
 local Waypoint = { }
 local metatable = { __index = Waypoint }
@@ -32,25 +44,33 @@ function Waypoint.set_metatable(instance)
 
 end
 
--- [Comment]
--- Creates a new waypoint instance.
--- Creates the entity if spawn_entity is true.
--- returns an error if a waypoint already exists at the position and `spawn_entity` is true.
-function Waypoint.new(surface_name, position, spawn_entity)
-	
-    local new =
+function Waypoint.new()
+	local new =
     {
-        surface_name = surface_name,
-		position = position,
+        surface_name = "nauvis",
+		position = { x = 0, y = 0 },
 		highlighted = false,
         build_orders = { },
         mine_orders = { },
         craft_orders = { },
 		item_transfer_orders = { },
-		_on_changed_callbacks = { }
+		changed = Event.new()
 	}
 
 	Waypoint.set_metatable(new)
+
+	return new
+end
+
+-- [Comment]
+-- Creates a new waypoint instance.
+-- Creates the entity if spawn_entity is true.
+-- returns an error if a waypoint already exists at the position and `spawn_entity` is true.
+function Waypoint.new(surface_name, position, spawn_entity)
+	local new = Waypoint.new()
+
+	new.surface_name = surface_name
+	new.position = position
 
 	if spawn_entity == true then
 		local waypoint_entity = new:_spawn_entity()
@@ -72,7 +92,6 @@ function Waypoint.new_from_template(template)
 	new.mine_orders = { }
 	new.craft_orders = { }
 	new.item_transfer_orders = { }
-	new._on_changed_callbacks = { }
 
 	Waypoint.set_metatable(new)
 
@@ -103,39 +122,11 @@ function Waypoint.new_from_template(template)
 	return new
 end
 
-function Waypoint:to_template()
-	local template = util.clone_table(self)
-	template.position = util.clone_table(self.position)
-	template.build_orders = { }
-	template.mine_orders = { }
-	template.craft_orders = { }
-	template.item_transfer_orders = { }
+function Waypoint:to_template(seen)
+	local clone = util.clone_table(self)
+	clone.changed = nil
 
-	for index, order in pairs(self.build_orders) do
-		local order_template = order:to_template()
-		table.insert(template.build_orders, order_template)
-	end
-
-	for index, order in pairs(self.mine_orders) do
-		local order_template = order:to_template()
-		table.insert(template.mine_orders, order_template)
-	end
-
-	for index, order in pairs(self.craft_orders) do
-		local order_template = order:to_template()
-		table.insert(template.craft_orders, order_template)
-	end
-
-	for index, order in pairs(self.item_transfer_orders) do
-		local order_template = order:to_template()
-		table.insert(template.item_transfer_orders, order_template)
-	end
-
-
-	template.sequence = nil
-	template._on_changed_callbacks = nil
-
-	return template
+	return Template.convert_children(self, clone, seen)
 end
 
 function Waypoint:assign_sequence(sequence, index)
@@ -271,7 +262,7 @@ end
 
 function Waypoint:add_item_transfer_order(is_player_receiving, player_inventory_index, container_entity, container_inventory_index, items_to_transfer)
 	
-	local order = ItemTransferOrder.new(is_player_receiving, player_inventory, container_entity, container_inventory_index,, items_to_transfer)
+	local order = ItemTransferOrder.new(is_player_receiving, player_inventory, container_entity, container_inventory_index, items_to_transfer)
 
 	-- If we can't merge the order, then append it
 	
@@ -397,15 +388,7 @@ function Waypoint:_changed(event)
 	end
 end
 
---[Comment]
--- Registers a callback to be run before a waypoint changes and provides an event object. This is called every time any order is added or removed or the waypoint position and surface changes.
--- Parameters
--- sender :: The waypoint that triggered the callback.
--- type :: string: Can be any of [moved]
--- Additional type specific parameters:
--- -- moved
--- -- -- old_surface_name :: string
--- -- -- old_position :: table: {x , y}
+
 function Waypoint:on_changed(func)
 	if self._on_changed_callbacks[func] ~= nil then
 		error()

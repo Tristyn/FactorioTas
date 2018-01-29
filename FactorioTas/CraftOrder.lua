@@ -1,8 +1,11 @@
+local mt = require("persistent_mt")
+
 local CraftOrder = { }
 local metatable = { __index = CraftOrder }
+mt.init(CraftOrder, "CraftOrder", metatable)
 
 function CraftOrder.set_metatable(instance)
-    setmetatable(instance, metatable)
+    mt.bless(instance, metatable)
 end
 
 function CraftOrder.new(recipe_name, count)
@@ -24,7 +27,7 @@ end
 function CraftOrder.new_from_template(template)
     local new = util.clone_table(template)
 
-    CraftOrder.set_metatable(new)
+    mt.rebless(new)
 
     return new
 end

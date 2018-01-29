@@ -538,26 +538,10 @@ function util.clone_table(source_table)
     return target_table
 end
 
---[Comment]
--- Wraps the function in a callable table to ensure uniqueness.
--- Use this when a function variable must be unique, such as when used as a table key. 
-function util.function_delegate(func)
-    -- The ... and unpack keywords are dark corners of lua
+function util.assign_table(target_table, source_table)
+    for source_key, source_value in pairs(source_table) do
+        target_table[source_key] = source_value
+    end
 
-    -- Basically the __call metamethods treats the table as a callable function,
-    -- first argument of __call is the table being called, followed by the arguments of the call.
-    -- We want to discard the first argument, and forward the other to a call to `func`.
-    -- To do that we capture arg one in the variable `self` so it can be ignored,
-    -- and capture the subsequent arguments in the ... structure.  
-    -- Clone the call arguments we want into a table: {...} 
-    -- Then call the function where each table entry is an argument: func(unpack({...}))
-
-    -- This is some disgusting syntax yo 
-
-    local metatable = { __call = function(self, ...) func(unpack({...})) end }
-    
-    
-    local delegate = { }
-    setmetatable(delegate, metatable)
-    return delegate
+    return target_table
 end

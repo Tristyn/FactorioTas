@@ -1,12 +1,35 @@
 local tas = require("tas")
+local Delegate = require("Delegate")
 
 tas.gui = { }
 
 function tas.gui.init_globals()
+    error(serpent.block(_G.tas.gui.on_dropdown_selection_changed))
     global.gui = { }
     global.gui.click_event_callbacks = { }
     global.gui.check_changed_callbacks = { }
     global.gui.dropdown_selection_state_changed_callbacks = { }
+end
+
+function tas.gui.set_metatable()
+   
+    -- I don't like type guessing but it's a quick solution for getting save/load implemented
+    for k, callback in pairs(global.gui.click_event_callbacks) do
+        if type(callback) == "table" then
+            Delegate.set_metatable(callback, _G)
+        end
+    end
+    for k, callback in pairs(global.gui.check_changed_callbacks) do
+        if type(callback) == "table" then
+            Delegate.set_metatable(callback, _G)
+        end
+    end
+    for k, callback in pairs(global.gui.dropdown_selection_state_changed_callbacks) do
+        if type(callback) == "table" then
+            Delegate.set_metatable(callback, _G)
+        end
+    end
+
 end
 
 function tas.gui.init_player(player_index)
@@ -185,19 +208,27 @@ function tas.gui.show_entity_editor(player_index, entity, character)
             end
         end
 
-        local mine = entity_editor.root.add { type = "checkbox", caption = "mine", state = mine_order_exists, name = util.get_guid() }
-        tas.gui.register_check_changed_callback(mine, function()
-            if mine.state == true then
-                tas.add_mine_order(player_index, entity)
-            else
-                local waypoint = global.players[player_index].waypoint
-                if waypoint == nil then return end
-                local find_results = tas.find_mine_order_from_entity_and_waypoint(entity, waypoint)
-                tas.destroy_mine_order(find_results.mine_order)
-            end
-        end )
+        local mine_checkbox = entity_editor.root.add { type = "checkbox", caption = "mine", state = mine_order_exists, name = util.get_guid() }
+        local callback = Delegate.new({
+            mine_checkbox = mine_checkbox,
+            player_index = player_index,
+            entity = entity
+        }, _G, function(env) return env.tas.gui.mine_checkbox_changed_callback end )
+        tas.gui.register_check_changed_callback(mine_checkbox, callback)
     end
 
+end
+
+function tas.gui.mine_checkbox_changed_callback(closure, env, event)
+    local _ENV = env
+    if closure.mine_checkbox.state == true then
+        tas.add_mine_order(closure.player_index, closure.entity)
+    else
+        local waypoint = global.players[closure.player_index].waypoint
+        if waypoint == nil then return end
+        local find_results = tas.find_mine_order_from_entity_and_waypoint(closure.entity, waypoint)
+        tas.destroy_mine_order(find_results.mine_order)
+    end
 end
 
 function tas.gui.handle_inventory_transfer_dropdown_changed(dropdown_element, player_index)
@@ -305,24 +336,39 @@ function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index
             local button_frame = mine_order_frame.add { type = "flow", direction = "horizontal" }
 
             local increment_count = button_frame.add { type = "button", caption = "+", style = "playback-button", name = util.get_guid() }
-            tas.gui.register_click_callback(increment_count, function()
-                tas.set_mine_order_count(mine_order, mine_order.count + 1)
-                mine_order_label.caption = tas.gui.mine_order_info_to_localised_string(mine_order)
-            end )
+            tas.gui.register_click_callback(increment_count, Delegate.new({
+                mine_order = mine_order,
+                mine_order_label = mine_order_label
+            }, _G, function(closure, env, event)
+                local _ENV = env
+                tas.set_mine_order_count(closure.mine_order, closure.mine_order.count + 1)
+                closure.mine_order_label.caption = tas.gui.mine_order_info_to_localised_string(closure.mine_order)
+            end ))
 
             local decrement_count = button_frame.add { type = "button", caption = "-", style = "playback-button", name = util.get_guid() }
-            tas.gui.register_click_callback(decrement_count, function()
-                if mine_order.count <= 1 then return end
-                tas.set_mine_order_count(mine_order, mine_order.count - 1)
-                mine_order_label.caption = tas.gui.mine_order_info_to_localised_string(mine_order)
-            end )
+            tas.gui.register_click_callback(decrement_count, Delegate.new({
+                mine_order = mine_order,
+                mine_order_label = mine_order_label
+            }, _G, function(closure, env, event)
+                local _ENV = env
+                if closure.mine_order.count <= 1 then return end
+                tas.set_mine_order_count(closure.mine_order, closure.mine_order.count - 1)
+                closure.mine_order_label.caption = tas.gui.mine_order_info_to_localised_string(closure.mine_order)
+            end ))
 
             local destroy = button_frame.add { type = "button", caption = "x", style = "playback-button", name = util.get_guid() }
-            tas.gui.register_click_callback(destroy, function()
+            tas.gui.register_click_callback(destroy, Delegate.new({
+                mine_order = mine_order, 
+                mine_order_frame = mine_order_frame,
+                increment = increment_count,
+                decrement = decrement_count,
+                destroy = destroy
+            }, _G, function(closure, env, event)
+                local _ENV = env
                 tas.destroy_mine_order(mine_order)
-                mine_order_frame.destroy()
-                tas.gui.unregister_click_callbacks(increment_count, decrement_count, destroy)
-            end )
+                closure.mine_order_frame.destroy()
+                tas.gui.unregister_click_callbacks(closure.increment, closure.decrement, closure.destroy)
+            end ))
 
         end
     end
@@ -427,9 +473,17 @@ function tas.gui.build_inventory_grid_control(container_frame, inventory, sprite
             local btn = tas.gui.build_inventory_item_control(inventory_container, item_stack, sprite_path_prefix)
 
             if on_item_stack_clicked_callback ~= nil then
-                tas.gui.register_click_callback(btn, function(event)
-                    on_item_stack_clicked_callback( { gui_element = btn, click_event = event, inventory = inventory, item_stack = item_stack, item_stack_index = i })
-                end )
+                tas.gui.register_click_callback(btn, Delegate.new({
+                    gui_element = btn,
+                    inventory = inventory,
+                    item_stack = item_stack,
+                    item_stack_index = i,
+                    inner_callback = on_item_stack_clicked_callback
+                }, _G, function(closure, env, click_event)
+                    local event = util.clone_table(closure)
+                    event.click_event = click_event
+                    closure.inner_callback(event)
+                end ))
             end
 
         end

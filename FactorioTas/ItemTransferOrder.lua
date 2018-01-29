@@ -1,10 +1,12 @@
 local mathex = require("mathex")
+local mt = require("persistent_mt")
 
 local ItemTransferOrder = { }
 local metatable = { __index = ItemTransferOrder }
+mt.init(ItemTransferOrder, "ItemTransferOrder", metatable)
 
 function ItemTransferOrder.set_metatable(instance)
-	setmetatable(instance, metatable)
+	mt.bless(instance, metatable)
 end
 
 function ItemTransferOrder.new(is_player_receiving, player_inventory_index, container_entity, container_inventory_index, item_stack)

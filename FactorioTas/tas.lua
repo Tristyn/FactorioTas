@@ -3,7 +3,7 @@ local Waypoint = require("Waypoint")
 local Sequence = require("Sequence")
 local SequenceIndexer = require("SequenceIndexer")
 local PlaybackController = require("PlaybackController")
-
+local Delegate = require("Delegate")
 
 local tas = { }
 
@@ -12,36 +12,21 @@ function tas.init_globals()
     global.playback_controller = PlaybackController.new()
     global.players = { }
     global.arrow_auto_update_repository = { }
+
+    global.sequence_changed_delegate = Delegate.new(nil, _G, tas.on_sequence_changed) 
+    global.sequence_indexer_changed_delegate = Delegate.new(nil, _G, tas.on_sequence_indexer_changed)
+    
+    global.sequence_indexer:on_changed(global.sequence_indexer_changed_delegate)
 end
 
 function tas.set_metatable()
-    local sequence_indexer_changed_delegate = util.function_delegate(tas.on_sequence_indexer_changed)
-    local sequence_changed_delegate = util.function_delegate(tas.on_sequence_changed)     
-
     SequenceIndexer.set_metatable(global.sequence_indexer)
     PlaybackController.set_metatable(global.playback_controller)
 
-    for i, player_info in pairs(global.players) do
-        if player_info.waypoint ~= nil then
-            Waypoint.set_metatable(player_info.waypoint)
-        end
-    end
+    Delegate.set_metatable(global.sequence_changed_delegate, _G)
+    Delegate.set_metatable(global.sequence_indexer_changed_delegate, _G)
 
-    if global.sequence_indexer_changed_delegate ~= nil then
-        global.sequence_indexer:unregister_on_changed(global.sequence_indexer_changed_delegate)
-    end
-    global.sequence_indexer:on_changed(sequence_indexer_changed_delegate)
-
-    for k, sequence in pairs(global.sequence_indexer.sequences) do
-        if global.sequence_changed_delegate ~= nil then
-            sequence:unregister_on_changed(global.sequence_changed_delegate)
-        end
-        sequence:on_changed(sequence_changed_delegate)
-    end
-
-    
-    global.sequence_indexer_changed_delegate = sequence_indexer_changed_delegate
-    global.sequence_changed_delegate = sequence_changed_delegate
+    tas.gui.set_metatable()
 end
 
 function tas.on_player_created(event)
@@ -531,13 +516,13 @@ function tas.on_pre_mined_entity(event)
 
 end
 
-function tas.add_item_transfer_order(player_index, is_player_receiving, container_entity, container_inventory_index, items_to_transfer)
+function tas.add_item_transfer_order(player_index, is_player_receiving, player_inventory_index, container_entity, container_inventory_index, items_to_transfer)
     if tas.is_waypoint_selected(player_index) == false then
         return false
     end
     
     local waypoint = global.players[player_index].waypoint
-    waypoint:add_item_transfer_order(is_player_receiving, character_inventory, container_entity, container_inventory_index, items_to_transfer)
+    waypoint:add_item_transfer_order(is_player_receiving, player_inventory_index, container_entity, container_inventory_index, items_to_transfer)
 end
 
 function tas.destroy_item_transfer_order(item_transfer_order)
@@ -775,7 +760,8 @@ function tas.insert_arrow_into_auto_update_respository(arrow_facade)
     global.arrow_auto_update_repository[arrow_facade] = arrow_facade
 end
 
-function tas.on_sequence_indexer_changed(event)
+function tas.on_sequence_indexer_changed(env, event)
+    local _ENV = env
     if event.type == "add_sequence" then
         event.sequence:on_changed(global.sequence_changed_delegate)
         global.playback_controller:new_runner(event.sequence, defines.controllers.character)
@@ -802,7 +788,8 @@ function tas.on_sequence_indexer_changed(event)
     end
 end
 
-function tas.on_sequence_changed(event)
+function tas.on_sequence_changed(env, event)
+    local _ENV = env
     if event.type == "remove_waypoint" then
         for index, player in pairs(global.players) do
             if player.waypoint == event.waypoint then

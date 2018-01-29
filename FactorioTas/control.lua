@@ -71,9 +71,9 @@ script.on_init( function()
 end )
 
 script.on_load( function()
-    -- Dont capture and print error, printing will result in another error 
-    -- (resulting in loss of the initial stacktrace) because `game` is nil.
-    -- Instead collect the traceback in err and rethrow.
+    -- Dont capture and print error, printing will result in another error because `game` is nil.
+    -- (resulting in loss of the initial stacktrace).
+    -- Instead collect the traceback in err and rethrow to display it in the main menu.
     local _, err = xpcall(function() 
         tas.set_metatable()
     end, debug.traceback, event)

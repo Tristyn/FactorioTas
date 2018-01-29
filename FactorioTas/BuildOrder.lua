@@ -1,8 +1,11 @@
+local mt = require("persistent_mt")
+
 local BuildOrder = { }
 local metatable = { __index = BuildOrder }
+mt.init(BuildOrder, "BuildOrder", metatable)
 
 function BuildOrder.set_metatable(instance)
-    setmetatable(instance, metatable)
+    mt.bless(instance, metatable)
 end
 
 --[Comment]
@@ -35,7 +38,7 @@ function BuildOrder.new_from_template(template)
     local new = util.clone_table(template)
     new.position = util.clone_table(template.position)
 
-    BuildOrder.set_metatable(new)
+    mt.rebless(new)
 
     new:spawn_entity(true)
 

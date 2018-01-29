@@ -2,6 +2,7 @@
 
 local Sequence = require("Sequence")
 local Waypoint = require("Waypoint")
+local Delegate = require("Delegate")
 
 local SequenceIndexer = { }
 local metatable = { __index = SequenceIndexer }
@@ -13,28 +14,12 @@ function SequenceIndexer.set_metatable(instance)
 
 	setmetatable(instance, metatable)
 
-	-- The callbacks requires a unique identity to be able to unregister so
-	-- create a delegate per instance
-	local on_sequence_changed_delegate = util.function_delegate(function(event) instance:_on_sequence_changed(event) end)
-	local on_waypoint_changed_delegate = util.function_delegate(function(event) instance:_on_waypoint_changed(event) end)
-
+	Delegate.set_metatable(instance._on_sequence_changed_delegate, _G)
+	Delegate.set_metatable(instance._on_waypoint_changed_delegate, _G)
+	
 	for k, sequence in pairs(instance.sequences) do
 		Sequence.set_metatable(sequence)
-		if instance._on_sequence_changed_delegate ~= nil then
-			sequence:unregister_on_changed(instance._on_sequence_changed_delegate)
-			sequence:on_changed(on_sequence_changed_delegate)
-		end
-
-		if instance._on_waypoint_changed_delegate ~= nil then
-			for k, waypoint in pairs(sequence.waypoints) do
-				waypoint:unregister_on_changed(instance._on_waypoint_changed_delegate)
-				waypoint:on_changed(on_waypoint_changed_delegate)
-			end
-		end
 	end
-
-	instance._on_sequence_changed_delegate = on_sequence_changed_delegate
-	instance._on_waypoint_changed_delegate = on_waypoint_changed_delegate
 end
 
 function SequenceIndexer.new()
@@ -42,8 +27,12 @@ function SequenceIndexer.new()
 	local new = {
 		_waypoint_index = { },
 		sequences = { },
+
 		_on_changed_callbacks = { }
 	}
+
+	new._on_sequence_changed_delegate = Delegate.new(new, _G, SequenceIndexer._on_sequence_changed)
+	new._on_waypoint_changed_delegate = Delegate.new(new, _G, SequenceIndexer._on_waypoint_changed)
 
 	SequenceIndexer.set_metatable(new)
 
@@ -124,17 +113,17 @@ function SequenceIndexer:unregister_on_changed(func)
 	self._on_changed_callbacks[func] = nil
 end
 
-function SequenceIndexer:_changed(type, sequence)
-	fail_if_missing(type)
+function SequenceIndexer:_changed(event_type, sequence)
+	fail_if_missing(event_type)
 	fail_if_missing(sequence)
 
 	local event = {
 		sender = self,
-		type = type,
+		type = event_type,
 		sequence = sequence
 	}
 
-	for k,func in pairs(self._on_changed_callbacks) do
+	for k, func in pairs(self._on_changed_callbacks) do
 		func(event)
 	end
 end
@@ -159,7 +148,8 @@ function SequenceIndexer:_remove_waypoint_from_index(waypoint)
 	self._waypoint_index[waypoint:to_string()] = nil
 end
 
-function SequenceIndexer:_on_sequence_changed(event)
+function SequenceIndexer:_on_sequence_changed(self, env, event)
+	local _ENV = env 
 	if event.type == "add_waypoint" then
 		self:_add_waypoint(event.waypoint)
 	elseif event.type == "remove_waypoint" then
@@ -167,7 +157,8 @@ function SequenceIndexer:_on_sequence_changed(event)
 	end
 end
 
-function SequenceIndexer:_on_waypoint_changed(event)
+function SequenceIndexer:_on_waypoint_changed(self, env, event)
+	local _ENV = env
 	if event.type == "moved" then
 		-- create a dummy with the new changes only to index it 
 		local dummy = Waypoint.new(event.old_surface_name, event.old_position)

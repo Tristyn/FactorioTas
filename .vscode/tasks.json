@@ -4,7 +4,7 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "taskName": "Deploy to lib/factorio_0.14",
+            "label": "Deploy to lib/factorio_0.15",
             "type": "shell",
             "group": {
                 "kind": "build",
