@@ -3,30 +3,24 @@ local Waypoint = require("Waypoint")
 local Sequence = require("Sequence")
 local SequenceIndexer = require("SequenceIndexer")
 local PlaybackController = require("PlaybackController")
-local Delegate = require("Delegate")
+local Gui = require("Gui")
 
 local tas = { }
 
 function tas.init_globals()
     global.sequence_indexer = SequenceIndexer.new()
     global.playback_controller = PlaybackController.new()
+    global.gui = Gui.new()
     global.players = { }
     global.arrow_auto_update_repository = { }
 
-    global.sequence_changed_delegate = Delegate.new(nil, _G, tas.on_sequence_changed) 
-    global.sequence_indexer_changed_delegate = Delegate.new(nil, _G, tas.on_sequence_indexer_changed)
-    
-    global.sequence_indexer:on_changed(global.sequence_indexer_changed_delegate)
+    global.sequence_indexer.sequence_changed:add(tas, "_on_sequence_changed")
 end
 
 function tas.set_metatable()
     SequenceIndexer.set_metatable(global.sequence_indexer)
     PlaybackController.set_metatable(global.playback_controller)
-
-    Delegate.set_metatable(global.sequence_changed_delegate, _G)
-    Delegate.set_metatable(global.sequence_indexer_changed_delegate, _G)
-
-    tas.gui.set_metatable()
+    Gui.set_metatable(global.gui)
 end
 
 function tas.on_player_created(event)
@@ -332,7 +326,7 @@ end
 function tas.select_waypoint(player_index, waypoint)
     fail_if_missing(player_index)
     fail_if_missing(waypoint)
-    
+
     local player = global.players[player_index]
 
     -- Remove the old highlight
@@ -348,21 +342,20 @@ function tas.select_waypoint(player_index, waypoint)
         -- Create the 'highlight' entity
         waypoint:set_highlight(true)
 
-        if waypoint ~= nil then
-            tas.gui.show_waypoint_info(player_index, waypoint.sequence.index, waypoint.index)
-        end
+        tas.gui.show_waypoint_info(player_index, waypoint.sequence.index, waypoint.index)
     end
 end
 
 function tas.insert_waypoint(waypoint_entity, player_index)
 
     local player = global.players[player_index]
-    local sequence = player.waypoint.sequence
-    local waypoint_insert_index = player.waypoint.index + 1
-
-    local waypoint = sequence:insert_waypoint_from_entity(waypoint_insert_index, waypoint_entity)
+    if player.waypoint ~= null then
+        local sequence = player.waypoint.sequence
+        local waypoint_insert_index = player.waypoint.index + 1
+        local waypoint = sequence:insert_waypoint_from_entity(waypoint_insert_index, waypoint_entity)
+        tas.select_waypoint(player_index, waypoint)
+    end
     
-    tas.select_waypoint(player_index, waypoint)
 end
 
 function tas.on_built_waypoint(created_entity, player_index)
@@ -371,6 +364,10 @@ function tas.on_built_waypoint(created_entity, player_index)
     local player = global.players[player_index]
 
     local selected_waypoint = player.waypoint
+
+    if player.waypoint == null then
+        error()
+    end
 
     if player.gui.current_state == "move" then
         selected_waypoint:move_to_entity(created_entity)
@@ -471,12 +468,12 @@ function tas.remove_waypoint(waypoint_entity)
     local waypoint = global.sequence_indexer:find_waypoint_from_entity(waypoint_entity)
 
     if waypoint == nil then
-        msg_all( { "TAS-err-generic", "Could not locate data for waypoint entity. This should never happen. Stacktrace: " .. debug.traceback() })
+        game.print( { "TAS-err-generic", "Could not locate data for waypoint entity. This should never happen. Stacktrace: " .. debug.traceback() })
         return false
     end
 
     if waypoint.sequence:can_remove_waypoint(waypoint.index) == false then
-        msg_all( { "TAS-err-generic", "Can't remove the only waypoint in the sequence." } )
+        game.print( { "TAS-err-generic", "Can't remove the only waypoint in the sequence." } )
         return false
     end
 
@@ -609,7 +606,7 @@ end
 function tas.on_left_click(event)
     local player_index = event.player_index
     local player = game.players[player_index]
-
+    
     if player.selected == nil then return end
 
     local entity = player.selected
@@ -760,37 +757,16 @@ function tas.insert_arrow_into_auto_update_respository(arrow_facade)
     global.arrow_auto_update_repository[arrow_facade] = arrow_facade
 end
 
-function tas.on_sequence_indexer_changed(env, event)
-    local _ENV = env
-    if event.type == "add_sequence" then
-        event.sequence:on_changed(global.sequence_changed_delegate)
-        global.playback_controller:new_runner(event.sequence, defines.controllers.character)
-
+function tas._on_sequence_changed(event)
+    
+    if event.type == "add_waypoint" then
         for index, player in pairs(global.players) do
-            if tas.is_waypoint_selected(index) == false then
-                tas.select_waypoint(index, event.sequence.waypoints[1])
+            if player.waypoint == nil then
+                game.print("Highlight")
+                tas.select_waypoint(index, event.waypoint)
             end
         end
-    elseif event.type == "remove_sequence" then
-        event.sequence:unregister_on_changed(global.sequence_changed_delegate)
-
-        for index, player in pairs(global.players) do
-            if tas.is_waypoint_selected(index) == true and player.waypoint.sequence == event.sequence then
-                -- select a new waypoint
-                local sequences = global.sequence_indexer.sequences
-                if #sequences > 0 then
-                    tas.select_waypoint(index, sequences[1].waypoints[1])
-                else
-                    tas.select_waypoint(index, nil)
-                end
-            end
-        end
-    end
-end
-
-function tas.on_sequence_changed(env, event)
-    local _ENV = env
-    if event.type == "remove_waypoint" then
+    elseif event.type == "remove_waypoint" then
         for index, player in pairs(global.players) do
             if player.waypoint == event.waypoint then
                 -- select a new waypoint

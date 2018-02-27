@@ -1,5 +1,5 @@
 local Event = { }
-local metatable = { }
+local metatable = { __index = Event }
 
 function Event.set_metatable(instance)
 	setmetatable(instance, metatable)
@@ -7,7 +7,7 @@ end
 
 function Event.new()
 	local new = {
-		callback_objects = { }
+		callback_objects = { },
 		callback_objects_num_entries = { }
 	}
 
@@ -20,7 +20,7 @@ function Event:add(callback_object, callback_function_name)
 	-- ensure the callback exists and is callable
 	local func = callback_object[callback_function_name]
 	if Event._is_callable(func) == false then
-		error()
+		error("Couldn't find function " .. callback_function_name .. " in callback object.")
 	end
 
 	local obj_callbacks = self.callback_objects[callback_object]
@@ -33,11 +33,12 @@ function Event:add(callback_object, callback_function_name)
 		obj_num_entries = 0
 	end
 	
-
-	obj_callbacks[callback_function_name] ~= nil then error() end
+	if obj_callbacks[callback_function_name] ~= nil then
+		error("The callback was added twice.")
+	end
 
 	obj_num_entries = obj_num_entries + 1
-	obj_callbacks[callback_function_name] = true
+	obj_callbacks[callback_function_name] = callback_function_name
 	self.callback_objects_num_entries[callback_object] = obj_num_entries
 end
 
@@ -51,14 +52,15 @@ end
 
 function Event:remove(callback_object, callback_function_name)
 	local obj_callbacks = self.callback_objects[callback_object]
-	if obj_callbacks = nil then error() end
-	local callback_exists = obj_callbacks[callback_function_name]
+	if obj_callbacks == nil then error() end
+	local callback_exists = obj_callbacks[callback_function_name] ~= nil
 
 	if not callback_exists == true then error()	end
 	obj_callbacks[callback_function_name] = nil
 	
-	local num_entries = self.callback_objects_num_entries[callback_object] - 1
-	if num_entries = 0 then
+	self.callback_objects_num_entries[callback_object] = self.callback_objects_num_entries[callback_object] - 1
+	local num_entries = self.callback_objects_num_entries[callback_object]
+	if num_entries == 0 then
 		self.callback_objects[callback_object] = nil
 		self.callback_objects_num_entries[callback_object] = nil
 	end

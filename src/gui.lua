@@ -1,36 +1,52 @@
 local tas = require("tas")
 local Delegate = require("Delegate")
 
+local Gui = { }
+local metatable = { __index = Gui }
+
+
 tas.gui = { }
 
 function tas.gui.init_globals()
-    error(serpent.block(_G.tas.gui.on_dropdown_selection_changed))
     global.gui = { }
     global.gui.click_event_callbacks = { }
     global.gui.check_changed_callbacks = { }
     global.gui.dropdown_selection_state_changed_callbacks = { }
 end
 
-function tas.gui.set_metatable()
+function Gui.set_metatable()
    
     -- I don't like type guessing but it's a quick solution for getting save/load implemented
     for k, callback in pairs(global.gui.click_event_callbacks) do
         if type(callback) == "table" then
-            Delegate.set_metatable(callback, _G)
+            Delegate.set_env(callback, _G)
         end
     end
     for k, callback in pairs(global.gui.check_changed_callbacks) do
         if type(callback) == "table" then
-            Delegate.set_metatable(callback, _G)
+            Delegate.set_env(callback, _G)
         end
     end
     for k, callback in pairs(global.gui.dropdown_selection_state_changed_callbacks) do
         if type(callback) == "table" then
-            Delegate.set_metatable(callback, _G)
+            Delegate.set_env(callback, _G)
         end
     end
 
 end
+
+function Gui.new()
+    local new = { 
+        click_event_callbacks = { },
+        check_changed_callbacks = { },
+        dropdown_selection_state_changed_callbacks = { }
+    }
+
+    Gui.set_metatable(new)
+
+    return new
+end
+
 
 function tas.gui.init_player(player_index)
     fail_if_missing(player_index)
@@ -63,10 +79,10 @@ function tas.gui.init_player(player_index)
 
     local playback = gui.editor.add { type = "flow", direction = "horizontal" }
     gui.playback = { }
-    gui.playback.reset = playback.add { type = "button", caption = "reset", style = "playback-button" }
-    gui.playback.play_pause = playback.add { type = "button", caption = "play", style = "playback-button" }
-    gui.playback.step = playback.add { type = "button", caption = "step:", style = "playback-button" }
-    gui.playback.step_ticks = playback.add { type = "textfield", caption = "# ticks", style = "playback-textfield" }
+    gui.playback.reset = playback.add { type = "button", caption = "reset"--[[, style = "playback-button"--]] }
+    gui.playback.play_pause = playback.add { type = "button", caption = "play"--[[, style = "playback-button"--]] }
+    gui.playback.step = playback.add { type = "button", caption = "step:"--[[, style = "playback-button"--]] }
+    gui.playback.step_ticks = playback.add { type = "textfield", caption = "# ticks"--[[, style = "playback-textfield"--]] }
     gui.playback.step_ticks.text = "10"
 
     gui.waypoint_mode = gui.editor.add { type = "button", caption = "insert waypoint" }
@@ -317,7 +333,7 @@ function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index
     gui.sequence_index = sequence_index
     gui.waypoint_index = waypoint_index
     local container_frame = gui.waypoint_container.add { type = "frame", direction = "vertical", caption = "Waypoint # " .. waypoint_index }
-    gui.waypoint = container_frame.add { type = "table", colspan = 1}
+    gui.waypoint = container_frame.add { type = "table", column_count = 1}
     
     -- delay
 
@@ -335,7 +351,7 @@ function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index
 
             local button_frame = mine_order_frame.add { type = "flow", direction = "horizontal" }
 
-            local increment_count = button_frame.add { type = "button", caption = "+", style = "playback-button", name = util.get_guid() }
+            local increment_count = button_frame.add { type = "button", caption = "+"--[[, style = "playback-button"--]], name = util.get_guid() }
             tas.gui.register_click_callback(increment_count, Delegate.new({
                 mine_order = mine_order,
                 mine_order_label = mine_order_label
@@ -345,7 +361,7 @@ function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index
                 closure.mine_order_label.caption = tas.gui.mine_order_info_to_localised_string(closure.mine_order)
             end ))
 
-            local decrement_count = button_frame.add { type = "button", caption = "-", style = "playback-button", name = util.get_guid() }
+            local decrement_count = button_frame.add { type = "button", caption = "-"--[[, style = "playback-button"--]], name = util.get_guid() }
             tas.gui.register_click_callback(decrement_count, Delegate.new({
                 mine_order = mine_order,
                 mine_order_label = mine_order_label
@@ -356,7 +372,7 @@ function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index
                 closure.mine_order_label.caption = tas.gui.mine_order_info_to_localised_string(closure.mine_order)
             end ))
 
-            local destroy = button_frame.add { type = "button", caption = "x", style = "playback-button", name = util.get_guid() }
+            local destroy = button_frame.add { type = "button", caption = "x"--[[, style = "playback-button"--]], name = util.get_guid() }
             tas.gui.register_click_callback(destroy, Delegate.new({
                 mine_order = mine_order, 
                 mine_order_frame = mine_order_frame,
@@ -387,7 +403,7 @@ function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index
             gui.waypoint.add{type ="label", caption = "item transfers" }
         end
         
-        local item_transfer_table = gui.waypoint.add { type = "table", colspan = 5 }
+        local item_transfer_table = gui.waypoint.add { type = "table", column_count = 5 }
         local item_transfer_rows = { }
 
         for i, order in ipairs(waypoint.item_transfer_orders) do
@@ -404,8 +420,8 @@ function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index
             item_transfer_row.reveal_entity_button = tas.gui.build_inventory_item_control(item_transfer_table, { name = order.container_name, count = 0 } , "entity/")
             item_transfer_table.add { type = "sprite", sprite = transfer_direction_sprite}
             item_transfer_row.increment_button = tas.gui.build_inventory_item_control(item_transfer_table, order.item_stack, "item/")
-            item_transfer_row.decrement_button = item_transfer_table.add { type = "sprite-button", sprite = "tas-decrement", style = "button-style"}
-            item_transfer_row.remove_button = item_transfer_table.add { type = "sprite-button", sprite = "tas-cancel", style = "button-style"}
+            item_transfer_row.decrement_button = item_transfer_table.add { type = "sprite-button", sprite = "tas-decrement"--[[, style = "button-style"--]]}
+            item_transfer_row.remove_button = item_transfer_table.add { type = "sprite-button", sprite = "tas-cancel"--[[, style = "button-style"--]]}
         end
 
         gui.waypoint_editor.item_transfer_rows = item_transfer_rows
@@ -462,7 +478,10 @@ end
 -- on_item_stack_clicked_callback accepts a table with the fields { gui_element, player_index, inventory, item_stack, item_stack_index }
 -- returns the root flow container elemnt for the inventory
 function tas.gui.build_inventory_grid_control(container_frame, inventory, sprite_path_prefix, on_item_stack_clicked_callback)
-    local inventory_container = container_frame.add { type = "table", colspan = 10 }
+    if on_item_stack_clicked_callback ~= nil and type(on_item_stack_clicked_callback) ~= "function" then error("Invalid callback type") end
+
+
+    local inventory_container = container_frame.add { type = "table", column_count = 10 }
 
     -- item_stack is SimpleItemStack or LuaItemStack. See http://lua-api.factorio.com/latest/Concepts.html#SimpleItemStack
     
@@ -493,7 +512,7 @@ function tas.gui.build_inventory_grid_control(container_frame, inventory, sprite
 end
 
 function tas.gui.build_inventory_item_control(container, item_stack, sprite_path_prefix)
-    local btn = container.add( { type = "sprite-button", sprite = sprite_path_prefix .. item_stack.name, style = "button-style", name = util.get_guid() })
+    local btn = container.add( { type = "sprite-button", sprite = sprite_path_prefix .. item_stack.name--[[, style = "button-style"--]], name = util.get_guid() })
     if item_stack.count > 0 then
         btn.add( { type = "label", caption = tostring(item_stack.count) })
     end
@@ -669,3 +688,5 @@ function tas.gui.on_check_changed(event)
         callback(element, player_index)
     end
 end
+
+return Gui

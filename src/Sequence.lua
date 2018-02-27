@@ -1,4 +1,5 @@
 local Waypoint = require("Waypoint")
+local Event = require("Event");
 
 local Sequence = { }
 local metatable = { __index = Sequence }
@@ -8,7 +9,8 @@ function Sequence.set_metatable(instance)
 		return
 	end
 
-	setmetatable(instance, metatable)
+    setmetatable(instance, metatable)
+    Event.set_metatable(instance.changed)
 
 	for k,v in pairs(instance.waypoints) do
 		Waypoint.set_metatable(v)
@@ -19,7 +21,7 @@ function Sequence.new()
     
     local sequence = {
         waypoints = { },
-        _on_changed_callbacks = { }
+        changed = Event.new();
     }
     
 	Sequence.set_metatable(sequence)
@@ -43,7 +45,7 @@ function Sequence.new_from_template(template)
     local new = util.clone_table(template)
 
     new.waypoints = { }
-    new._on_changed_callbacks = { }
+    new.changed = Event.new()
 
     Sequence.set_metatable(new)
 
@@ -65,8 +67,7 @@ function Sequence:to_template()
         table.insert(template.waypoints, waypoint_template)
     end
 
-    template._on_changed_callbacks = nil
-
+    template.changed = nil
     return template
 end
 
@@ -136,15 +137,8 @@ function Sequence:remove_waypoint(index)
     self:_changed("remove_waypoint", waypoint)
 end
 
-function Sequence:_changed(type, waypoint)
-    local event = {
-        sender = self,
-        type = type,
-        waypoint = waypoint,
-    }
-    for k, handler in pairs(self._on_changed_callbacks) do
-        handler(event)
-    end
+function Sequence:get_change_event(type, waypoint)
+    return Sequence.ChangedEvent.new(self, type, waypoint);
 end
 
 --[Comment]
@@ -154,25 +148,46 @@ end
 -- sender :: The sequence that triggered the callback.
 -- type :: string: Can be [add_waypoint|remove_waypoint]
 -- waypoint :: Waypoint: The waypoint.
-function Sequence:on_changed(func)
-    fail_if_missing(func)
-
-    if self._on_changed_callbacks[func] ~= nil then
-        --error("Function reference was not unique. Consider using Delegate")
-        error()
-    end
-
-    self._on_changed_callbacks[func] = func
+function Sequence:_changed(type, waypoint)
+    local event = self:get_change_event(type, waypoint)
+    self.changed:invoke(event);
 end
 
-function Sequence:unregister_on_changed(func)
-    fail_if_missing(func)
 
-    if self._on_changed_callbacks[func] == nil then
-        error()
+
+
+
+
+
+local Changed = { }
+Sequence.ChangedEvent = Changed
+
+-- metatable
+local sequence_changed_mt = { __index = Sequence.ChangedEvent }
+function Changed.set_metatable(instance) 
+    if getmetatable(instance) ~= nil then
+        return
     end
 
-    self._on_changed_callbacks[func] = nil
+
+    setmetatable(instance, sequence_changed_mt)
+    Sequence.set_metatable(instance.sender)
+    Waypoint.set_metatable(instance.waypoint)
+    
+
+end
+--
+
+function Changed.new(sender_sequence, type, waypoint) 
+    local new = {
+        sender = sender_sequence,
+        type = type,
+        waypoint = waypoint,
+    }
+
+    Changed.set_metatable(new)
+
+    return new;
 end
 
 return Sequence

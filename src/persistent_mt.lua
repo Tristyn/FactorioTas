@@ -9,9 +9,9 @@ function persistent_mt.init(module, module_name, module_metatable)
 
 	assert(persistent_mt.mt_store[module_name] == nil)
 
-	metatable.mt_store[module_name] = module_metatable
+	persistent_mt.mt_store[module_name] = module_metatable
 	
-	module.__src = module_name
+	module_metatable.__src = module_name
 end
 
 function persistent_mt.bless(instance, module)
@@ -39,7 +39,7 @@ function persistent_mt.rebless(instance)
 
 	local module = require(src)
 
-	local mt = metatable.mt_store[src]
+	local mt = persistent_mt.mt_store[src]
 
 	if mt == nil then error("Must call init before bless") end
 	

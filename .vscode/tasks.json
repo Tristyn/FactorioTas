@@ -10,9 +10,7 @@
                 "kind": "build",
                 "isDefault": true
             },
-            "windows": {
-                "command": "./tasks/deploy.bat"
-            }
+            "command": "./tasks/deploy.sh",
         }
     ]
 }

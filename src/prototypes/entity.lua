@@ -5,6 +5,7 @@ data:extend(
         name = "tas-waypoint",
         flags = { "placeable-neutral", "placeable-off-grid", "not-on-map" },
         icon = "__FactorioTas__/graphics/entity/waypoint.png",
+        icon_size = 32,
         -- subgroup = "grass",
         order = "a[tas]",
 
@@ -38,6 +39,7 @@ data:extend(
         name = "tas-waypoint-selected",
         flags = { "placeable-neutral", "placeable-off-grid", "not-on-map" },
         icon = "__FactorioTas__/graphics/entity/waypoint-selected.png",
+        icon_size = 32,
         order = "a[tas]",
         collision_mask = { },
         selectable_in_game = false,
@@ -59,6 +61,7 @@ data:extend(
         name = "tas-arrow-proxy",
         flags = { "placeable-neutral", "placeable-off-grid", "not-on-map" },
         icon = "__FactorioTas__/graphics/entity/waypoint.png",
+        icon_size = 32,
         order = "a[tas]",
         collision_mask = { },
         selectable_in_game = false,

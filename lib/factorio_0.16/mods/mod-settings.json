@@ -1,0 +1,18 @@
+{
+  "startup": {},
+  "runtime-global": {
+    "bottleneck-signals-per-tick": {
+      "value": 40
+    },
+    "bottleneck-show-running-as": {
+      "value": "green"
+    },
+    "bottleneck-show-stopped-as": {
+      "value": "red"
+    },
+    "bottleneck-show-full-as": {
+      "value": "yellow"
+    }
+  },
+  "runtime-per-user": {}
+}

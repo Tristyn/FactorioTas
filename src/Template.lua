@@ -52,16 +52,16 @@ local function ret(val) return val end
 local function void() return end
 
 Template.type_handlers = {
-	"table" = Template.convert_table,
+	["table"] = Template.convert_table,
 	
-	"string" = ret,
-	"number" = ret,
-	"boolean" = ret,
+	["string"] = ret,
+	["number"] = ret,
+	["boolean"] = ret,
 	
-	"nil" = void,
-	"function" = void,
-	"userdata" = void,
-	"thread" = void,
+	["nil"] = void,
+	["function"] = void,
+	["userdata"] = void,
+	["thread"] = void,
 }
 
 return Template

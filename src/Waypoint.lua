@@ -25,6 +25,7 @@ function Waypoint.set_metatable(instance)
 	end
 
 	setmetatable(instance, metatable)
+	Event.set_metatable(instance.changed);
 
 	for k, v in pairs(instance.build_orders) do
 		BuildOrder.set_metatable(v)
@@ -44,7 +45,11 @@ function Waypoint.set_metatable(instance)
 
 end
 
-function Waypoint.new()
+-- [Comment]
+-- Creates a new waypoint instance.
+-- Creates the entity if spawn_entity is true.
+-- returns an error if a waypoint already exists at the position and `spawn_entity` is true.
+function Waypoint.new(surface_name, position, spawn_entity)
 	local new =
     {
         surface_name = "nauvis",
@@ -58,16 +63,6 @@ function Waypoint.new()
 	}
 
 	Waypoint.set_metatable(new)
-
-	return new
-end
-
--- [Comment]
--- Creates a new waypoint instance.
--- Creates the entity if spawn_entity is true.
--- returns an error if a waypoint already exists at the position and `spawn_entity` is true.
-function Waypoint.new(surface_name, position, spawn_entity)
-	local new = Waypoint.new()
 
 	new.surface_name = surface_name
 	new.position = position
@@ -150,7 +145,8 @@ function Waypoint:to_string()
 end
 
 function Waypoint.entity_to_string(waypoint_entity)
-	return util.entity.to_string(waypoint_entity)
+
+	return waypoint_entity.position.x .. '_' .. waypoint_entity.position.y .. '_' .. waypoint_entity.surface.name .. '_' .. "tas-waypoint" 
 end
 
 function Waypoint:get_entity()
@@ -360,7 +356,6 @@ end
 
 function Waypoint:set_highlight(highlighted)
 	self.highlighted = highlighted
-
 	if highlighted == true then
 		self:_spawn_highlight_entity()
 	elseif highlighted == false then
@@ -383,26 +378,7 @@ function Waypoint:has_character_arrived(character)
 end
 
 function Waypoint:_changed(event)
-	for _, func in pairs(self._on_changed_callbacks) do
-		func(event)
-	end
-end
-
-
-function Waypoint:on_changed(func)
-	if self._on_changed_callbacks[func] ~= nil then
-		error()
-	end
-	self._on_changed_callbacks[func] = func
-end
-
---[Comment]
--- Ends further callbacks. Returns true if the handler was found.
-function Waypoint:unregister_on_changed(func)
-	if self._on_changed_callbacks[func] == nil then
-		error()
-	end
-	self._on_changed_callbacks[func] = nil
+	self.changed:invoke(event)
 end
 
 --[Comment]

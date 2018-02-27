@@ -185,7 +185,7 @@ function BuildOrder:move_order_item_to_cursor_stack(player)
     if util.move_item_stack(player.cursor_stack, item_to_place, character, inventory_ids) == true then
         return true
     else
-        msg_all( { "TAS-err-generic", "Could not move items from the players hand into inventory because there wasn't room. This should never happen. Using cheats to delete the extra items.." })
+        game.print( { "TAS-err-generic", "Could not move items from the players hand into inventory because there wasn't room. This should never happen. Using cheats to delete the extra items.." })
         player.cursor_stack.clear()
         util.move_item_stack(player.cursor_stack, item_to_place, character, inventory_ids)
         return true
@@ -207,13 +207,13 @@ function BuildOrder:can_spawn_entity_through_player(player)
 
     -- Check for collisions with terrain or other entities.
     if self:can_spawn_entity() == false then
-        --msg_all( { "TAS-err-generic", "Couldn't place a " .. self.name .. " at {" .. self.position.x .. "," .. self.position.y .. "} because something was in the way." })
+        --game.print( { "TAS-err-generic", "Couldn't place a " .. self.name .. " at {" .. self.position.x .. "," .. self.position.y .. "} because something was in the way." })
         return false
         -- Check if the character ran out of placement range since last tick.
     end
 
     if self:can_reach(player) == false then
-        -- msg_all( { "TAS-err-generic", "Couldn't place a " .. self.name .. " at {" .. self.position.x .. "," .. self.position.y .. "} because the player left the area while putting the item in hand. Will retry." })
+        -- game.print( { "TAS-err-generic", "Couldn't place a " .. self.name .. " at {" .. self.position.x .. "," .. self.position.y .. "} because the player left the area while putting the item in hand. Will retry." })
         return false
     end
 
@@ -227,7 +227,7 @@ function BuildOrder:spawn_entity_through_player(player)
     local item_stack_to_build_from = self:_find_item_stack(player)
 
     if item_stack_to_build_from == nil then
-        --msg_all( { "TAS-err-generic", "Could not place " .. runner.in_progress_build_order.item_name .. " because it wasn't in the inventory." })
+        --game.print( { "TAS-err-generic", "Could not place " .. runner.in_progress_build_order.item_name .. " because it wasn't in the inventory." })
         return false
     end
 
@@ -239,11 +239,11 @@ function BuildOrder:spawn_entity_through_player(player)
 
     -- Check for collisions with terrain or other entities.
     if self:can_spawn_entity() == false then
-        --msg_all( { "TAS-err-generic", "Couldn't place a " .. self.name .. " at {" .. self.position.x .. "," .. self.position.y .. "} because something was in the way." })
+        --game.print( { "TAS-err-generic", "Couldn't place a " .. self.name .. " at {" .. self.position.x .. "," .. self.position.y .. "} because something was in the way." })
         return false
         -- Check if the character ran out of placement range since last tick.
     elseif self:can_reach(player) == false then
-        -- msg_all( { "TAS-err-generic", "Couldn't place a " .. self.name .. " at {" .. self.position.x .. "," .. self.position.y .. "} because the player left the area while putting the item in hand. Will retry." })
+        -- game.print( { "TAS-err-generic", "Couldn't place a " .. self.name .. " at {" .. self.position.x .. "," .. self.position.y .. "} because the player left the area while putting the item in hand. Will retry." })
         return false
     else
         -- successsssss
