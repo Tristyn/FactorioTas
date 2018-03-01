@@ -1,45 +1,32 @@
-local tas = require("tas")
 local Delegate = require("Delegate")
+local GuiEvents = require("GuiEvents")
+local MineOrderView = require("MineOrderView")
+local tas = require("tas")
 
 local Gui = { }
 local metatable = { __index = Gui }
 
+function Gui.set_metatable(instance)
+    if getmetatable(instance) ~= nil then return end
 
-tas.gui = { }
+    setmetatable(instance, metatable)
 
-function tas.gui.init_globals()
-    global.gui = { }
-    global.gui.click_event_callbacks = { }
-    global.gui.check_changed_callbacks = { }
-    global.gui.dropdown_selection_state_changed_callbacks = { }
-end
+    tas.set_metatable()
+    GuiEvents.set_metatable(instance.gui_events)
 
-function Gui.set_metatable()
-   
-    -- I don't like type guessing but it's a quick solution for getting save/load implemented
-    for k, callback in pairs(global.gui.click_event_callbacks) do
-        if type(callback) == "table" then
-            Delegate.set_env(callback, _G)
-        end
-    end
-    for k, callback in pairs(global.gui.check_changed_callbacks) do
-        if type(callback) == "table" then
-            Delegate.set_env(callback, _G)
-        end
-    end
-    for k, callback in pairs(global.gui.dropdown_selection_state_changed_callbacks) do
-        if type(callback) == "table" then
-            Delegate.set_env(callback, _G)
+    for _, player_gui in pairs(instance.players) do
+        for _, mine_order_view in ipairs(player_gui.waypoint_editor.mine_orders) do
+            MineOrderView.set_metatable(mine_order_view)
         end
     end
 
 end
 
-function Gui.new()
-    local new = { 
-        click_event_callbacks = { },
-        check_changed_callbacks = { },
-        dropdown_selection_state_changed_callbacks = { }
+function Gui.new(gui_events)
+
+    local new = {
+        players = { },
+        gui_events = gui_events
     }
 
     Gui.set_metatable(new)
@@ -47,12 +34,13 @@ function Gui.new()
     return new
 end
 
-
-function tas.gui.init_player(player_index)
+function Gui:init_player(player_index)
     fail_if_missing(player_index)
 
+    tas.init_player(player_index)
+
     local gui = { }
-    global.players[player_index].gui = gui
+    self.players[player_index] = gui
 
     local player = game.players[player_index]
 
@@ -71,7 +59,8 @@ function tas.gui.init_player(player_index)
     }
     gui.waypoint_container = gui.root.add { type = "flow", direction = "vertical" }
     gui.waypoint_editor = {
-        item_transfer_rows = { }
+        item_transfer_rows = { },
+        mine_order_views = { }
     }
 
     -- Editor constructor
@@ -89,60 +78,62 @@ function tas.gui.init_player(player_index)
 
     -- End Editor constructor
 
-    tas.gui.hide_editor(player_index)
+    self:hide_editor(player_index)
 end
 
-function tas.gui.show_editor(player_index)
+function Gui:show_editor(player_index)
     fail_if_missing(player_index)
 
-    tas.gui.hide_editor(player_index)
+    self:hide_editor(player_index)
 
-    local gui = global.players[player_index].gui
+    local gui = self.players[player_index]
 
     -- gui.editor_visible_toggle.style.visible = false
     gui.root.style.visible = true
 end
 
-function tas.gui.hide_editor(player_index)
+function Gui:hide_editor(player_index)
     fail_if_missing(player_index)
 
-    local gui = global.players[player_index].gui
+    local gui = self.players[player_index]
 
     gui.root.style.visible = false
     -- gui.editor_visible_toggle.style.visible = true
 end
 
-function tas.gui.toggle_editor_visible(player_index)
+function Gui:toggle_editor_visible(player_index)
     fail_if_missing(player_index)
 
-    if global.players[player_index].gui.root.style.visible == true then
-        tas.gui.hide_editor(player_index)
+    if self.players[player_index].root.style.visible == true then
+        self:hide_editor(player_index)
     else
-        tas.gui.show_editor(player_index)
+        self:show_editor(player_index)
     end
 end
 
-function tas.gui.reset_waypoint_toggles(player_index)
+function Gui:reset_waypoint_toggles(player_index)
     fail_if_missing(player_index)
 
-    global.players[player_index].gui.waypoint_mode.caption = "insert waypoint"
+    self.players[player_index].waypoint_mode.caption = "insert waypoint"
 end
 
-function tas.gui.hide_entity_editor(player_index)
+function Gui:hide_entity_editor(player_index)
     fail_if_missing(player_index)
 
-    local gui = global.players[player_index].gui
+    local gui = self.players[player_index]
 
     if gui.entity_editor.root ~= nil then
         gui.entity_editor.container.clear()
     end
 end
 
-function tas.gui.show_entity_editor(player_index, entity, character)
+--[Comment]
+-- character can be nil
+function Gui:show_entity_editor(player_index, entity, character)
     fail_if_missing(player_index)
     fail_if_missing(entity)
 
-    local entity_editor = global.players[player_index].gui.entity_editor
+    local entity_editor = self.players[player_index].entity_editor
     local entity_type = nil
     if entity.type ~= "entity-ghost" then
         entity_type = entity.type
@@ -150,14 +141,14 @@ function tas.gui.show_entity_editor(player_index, entity, character)
         entity_type = entity.ghost_type
     end
 
-    tas.gui.hide_entity_editor(player_index)
+    self:hide_entity_editor(player_index)
 
     -- store the arguments so the editor can be refreshed at any time
     entity_editor.entity = entity
     entity_editor.character = character
 
     local container_frame = entity_editor.container.add { type = "frame", direction = "vertical" }
-    entity_editor.root = container_frame.add { type = "table", colspan = 1 }
+    entity_editor.root = container_frame.add { type = "table", column_count = 1 }
 
     -- inventory transfer ui
     -- transfer mode button: stack/item
@@ -165,10 +156,10 @@ function tas.gui.show_entity_editor(player_index, entity, character)
 
     -- Collect inventories
     local entity_inventories = util.entity.get_inventory_info(entity_type)
-    local character_inventories = util.entity.get_inventory_info(character.type)
+    local character_inventories = character and util.entity.get_inventory_info(character.type) or nil
 
     -- Inventory Transfer UI
-    if #entity_inventories > 0 and #character_inventories > 0 and entity ~= character then
+    if character ~= nil and #entity_inventories > 0 and #character_inventories > 0 and entity ~= character then
 
         local entity_inventory_names = { }
         for i = 1, #entity_inventories do
@@ -187,13 +178,14 @@ function tas.gui.show_entity_editor(player_index, entity, character)
             entity_inventory = entity.get_inventory(entity_inventories[1].id)
         end
         entity_editor.entity_inventory.dropdown = entity_editor.root.add { type = "drop-down", selected_index = entity_editor.entity_inventory.selected_inventory_index, items = entity_inventory_names, name = util.get_guid() }
-        tas.gui.register_dropdown_selection_changed_callback(entity_editor.entity_inventory.dropdown, tas.gui.handle_inventory_transfer_dropdown_changed)
+        local callback = Delegate.new(self, "handle_inventory_transfer_dropdown_changed")
+        self.gui_events:register_dropdown_selection_changed_callback(entity_editor.entity_inventory.dropdown, callback)
         if entity.type == "entity-ghost" then
             entity_editor.root.add { type = "label", caption = "ghost inventory inaccessible" }
         elseif entity_inventory == nil or entity_inventory.is_empty() == true then
             entity_editor.root.add { type = "label", caption = "empty" }
         else
-            tas.gui.build_inventory_grid_control(entity_editor.root, entity_inventory, "item/", tas.gui.entity_info_transfer_inventory_clicked_callback)
+            Gui:build_inventory_grid_control(entity_editor.root, entity_inventory, "item/", tas.gui.entity_info_transfer_inventory_clicked_callback)
         end
         
         -- Character Inventory
@@ -204,14 +196,15 @@ function tas.gui.show_entity_editor(player_index, entity, character)
             character_inventory = character.get_inventory(character_inventories[1].id)
         end
         entity_editor.character_inventory.dropdown = entity_editor.root.add { type = "drop-down", selected_index = entity_editor.character_inventory.selected_inventory_index, items = character_inventory_names, name = util.get_guid() }
-        tas.gui.register_dropdown_selection_changed_callback(entity_editor.character_inventory.dropdown,  tas.gui.handle_inventory_transfer_dropdown_changed)
+        local callback = Delegate.new(self, "handle_inventory_transfer_dropdown_changed")
+        self.gui_events:register_dropdown_selection_changed_callback(entity_editor.character_inventory.dropdown,  callback)
         if character_inventory.is_empty() == true then
             entity_editor.root.add { type = "label", caption = "empty" }
         else
-            tas.gui.build_inventory_grid_control(entity_editor.root, character_inventory, "item/", tas.gui.entity_info_transfer_inventory_clicked_callback)
+            self:build_inventory_grid_control(entity_editor.root, character_inventory, "item/", tas.gui.entity_info_transfer_inventory_clicked_callback)
         end
     end
-
+    
     
     -- entity mine order
     if entity.minable == true and entity.type ~= "resource" then
@@ -224,30 +217,34 @@ function tas.gui.show_entity_editor(player_index, entity, character)
             end
         end
 
-        local mine_checkbox = entity_editor.root.add { type = "checkbox", caption = "mine", state = mine_order_exists, name = util.get_guid() }
-        local callback = Delegate.new({
-            mine_checkbox = mine_checkbox,
-            player_index = player_index,
-            entity = entity
-        }, _G, function(env) return env.tas.gui.mine_checkbox_changed_callback end )
-        tas.gui.register_check_changed_callback(mine_checkbox, callback)
+        entity_editor.mine_checkbox = entity_editor.root.add { type = "checkbox", caption = "mine", state = mine_order_exists, name = util.get_guid() }
+        
+        local callback = Delegate.new(self, "mine_checkbox_changed_callback")
+        self.gui_events:register_check_changed_callback(entity_editor.mine_checkbox, callback)
     end
 
 end
 
-function tas.gui.mine_checkbox_changed_callback(closure, env, event)
-    local _ENV = env
-    if closure.mine_checkbox.state == true then
-        tas.add_mine_order(closure.player_index, closure.entity)
+function Gui:mine_checkbox_changed_callback(event)
+    local player_index = event.player_index
+    local entity_editor = self.players[player_index].entity_editor
+    local mine_checkbox = entity_editor.mine_checkbox
+    local entity = entity_editor.entity
+
+    if mine_checkbox.state == true then
+        tas.add_mine_order(player_index, entity)
     else
-        local waypoint = global.players[closure.player_index].waypoint
+        local waypoint = global.players[player_index].waypoint
         if waypoint == nil then return end
-        local find_results = tas.find_mine_order_from_entity_and_waypoint(closure.entity, waypoint)
+        local find_results = tas.find_mine_order_from_entity_and_waypoint(entity, waypoint)
         tas.destroy_mine_order(find_results.mine_order)
     end
 end
 
-function tas.gui.handle_inventory_transfer_dropdown_changed(dropdown_element, player_index)
+function Gui:handle_inventory_transfer_dropdown_changed(event)
+
+    local dropdown_element = event.element
+    local player_index = event.player_index
     local inventory_viewmodel = nil
     local entity = nil
     local entity_editor = global.players[player_index].gui.entity_editor
@@ -265,17 +262,17 @@ function tas.gui.handle_inventory_transfer_dropdown_changed(dropdown_element, pl
     local inventories = util.entity.get_inventory_info(entity.type)
     inventory_viewmodel.selected_inventory_index = inventories[inventory_viewmodel.dropdown.selected_index].id
 
-    tas.gui.refresh(player_index)
+    self:refresh(player_index)
 end
 
-function tas.gui.entity_info_transfer_inventory_clicked_callback(event)
+function Gui:entity_info_transfer_inventory_clicked_callback(event)
     -- event = { gui_element, player_index, inventory, item_stack, item_stack_index }
     local click_event = event.click_event
     local player_index = click_event.player_index
     local inventory = event.inventory
     local item_stack = event.item_stack
     local item_stack_index = event.item_stack_index
-    local entity_editor = global.players[player_index].gui.entity_editor
+    local entity_editor = self.players[player_index].entity_editor
     local character = entity_editor.character
     local entity = entity_editor.entity
 
@@ -289,26 +286,39 @@ function tas.gui.entity_info_transfer_inventory_clicked_callback(event)
 
     local items = { name = item_stack.name, count = item_stack_count }
     tas.add_item_transfer_order(player_index, is_player_receiving, character_inventory_index, entity,entity_inventory_index, items)
-    tas.gui.refresh(player_index)
+    self:refresh(player_index)
 end
 
-function tas.gui.hide_waypoint_info(player_index)
+function Gui:hide_waypoint_editor(player_index)
     fail_if_missing(player_index)
 
-    local gui = global.players[player_index].gui
+
+    local gui = self.players[player_index]
+
+    if gui.sequence_index ~= nil and gui.waypoint_index ~= nil then 
+        local waypoint = global.sequence_indexer.sequences[gui.sequence_index].waypoints[gui.waypoint_index]
+        waypoint.changed:remove(self, "waypoint_editor_waypoint_changed_handler")
+    end
+
 
     if gui.waypoint ~= nil then
+
+        for _, mine_order_view in ipairs(gui.waypoint_editor.mine_order_views) do
+            mine_order_view:dispose()
+        end
+
         gui.waypoint_container.clear()
+        gui.waypoint_editor.mine_order_views = { }
         gui.waypoint = nil
     end
 end
 
-function tas.gui.crafting_queue_item_clicked_callback(event)
+function Gui:crafting_queue_item_clicked_callback(event)
     local click_event = event.click_event
-    local gui = global.players[click_event.player_index].gui
+    local gui = self.players[click_event.player_index]
     local waypoint = global.sequence_indexer.sequences[gui.sequence_index].waypoints[gui.waypoint_index]
     local craft_order = waypoint.craft_orders[event.item_stack_index]
-   
+    
 
     local items_to_remove = util.get_item_stack_split_count(event, craft_order.recipe_name)
 
@@ -318,82 +328,38 @@ function tas.gui.crafting_queue_item_clicked_callback(event)
         waypoint:remove_craft_order(event.item_stack_index)
     end
     
-    tas.gui.refresh(click_event.player_index)
+    self:refresh(click_event.player_index)
 end
 
-function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index)
+function Gui:show_waypoint_editor(player_index, sequence_index, waypoint_index)
     fail_if_missing(player_index)
     fail_if_missing(sequence_index)
     fail_if_missing(waypoint_index)
 
-    tas.gui.hide_waypoint_info(player_index)
+    self:hide_waypoint_editor(player_index)
 
     local waypoint = global.sequence_indexer.sequences[sequence_index].waypoints[waypoint_index]
-    local gui = global.players[player_index].gui
+    local gui = self.players[player_index]
     gui.sequence_index = sequence_index
     gui.waypoint_index = waypoint_index
     local container_frame = gui.waypoint_container.add { type = "frame", direction = "vertical", caption = "Waypoint # " .. waypoint_index }
     gui.waypoint = container_frame.add { type = "table", column_count = 1}
-    
+
+    waypoint.changed:add(self, "waypoint_editor_waypoint_changed_handler")
+
     -- delay
 
-    -- mine orders targeted at resources
+    -- mine orders
     for _, mine_order in ipairs(waypoint.mine_orders) do
-
-        local mine_order_entity = mine_order:get_entity()
-        -- only show mine orders from resources here
-        if is_valid(mine_order_entity) and mine_order_entity.type == "resource" then
-
-            -- collect all controls for a mine order into a single frame for easy removal later
-            local mine_order_frame = gui.waypoint.add { type = "flow", direction = "vertical" }
-
-            local mine_order_label = mine_order_frame.add { type = "label", caption = tas.gui.mine_order_info_to_localised_string(mine_order) }
-
-            local button_frame = mine_order_frame.add { type = "flow", direction = "horizontal" }
-
-            local increment_count = button_frame.add { type = "button", caption = "+"--[[, style = "playback-button"--]], name = util.get_guid() }
-            tas.gui.register_click_callback(increment_count, Delegate.new({
-                mine_order = mine_order,
-                mine_order_label = mine_order_label
-            }, _G, function(closure, env, event)
-                local _ENV = env
-                tas.set_mine_order_count(closure.mine_order, closure.mine_order.count + 1)
-                closure.mine_order_label.caption = tas.gui.mine_order_info_to_localised_string(closure.mine_order)
-            end ))
-
-            local decrement_count = button_frame.add { type = "button", caption = "-"--[[, style = "playback-button"--]], name = util.get_guid() }
-            tas.gui.register_click_callback(decrement_count, Delegate.new({
-                mine_order = mine_order,
-                mine_order_label = mine_order_label
-            }, _G, function(closure, env, event)
-                local _ENV = env
-                if closure.mine_order.count <= 1 then return end
-                tas.set_mine_order_count(closure.mine_order, closure.mine_order.count - 1)
-                closure.mine_order_label.caption = tas.gui.mine_order_info_to_localised_string(closure.mine_order)
-            end ))
-
-            local destroy = button_frame.add { type = "button", caption = "x"--[[, style = "playback-button"--]], name = util.get_guid() }
-            tas.gui.register_click_callback(destroy, Delegate.new({
-                mine_order = mine_order, 
-                mine_order_frame = mine_order_frame,
-                increment = increment_count,
-                decrement = decrement_count,
-                destroy = destroy
-            }, _G, function(closure, env, event)
-                local _ENV = env
-                tas.destroy_mine_order(mine_order)
-                closure.mine_order_frame.destroy()
-                tas.gui.unregister_click_callbacks(closure.increment, closure.decrement, closure.destroy)
-            end ))
-
-        end
+        local mine_order_view = MineOrderView.new(gui.waypoint, self.gui_events, mine_order);
+        table.insert(gui.waypoint_editor.mine_order_views, mine_order_view)
     end
 
     -- crafting queue
     if #waypoint.craft_orders > 0 then
         gui.waypoint.add { type = "label", caption = "crafting queue" }
-        local craft_orders_as_inventory = tas.gui.craft_orders_to_inventory(waypoint.craft_orders)
-        tas.gui.build_inventory_grid_control(gui.waypoint, craft_orders_as_inventory, "recipe/", tas.gui.crafting_queue_item_clicked_callback)
+        local craft_orders_as_inventory = self:craft_orders_to_inventory(waypoint.craft_orders)
+        self:build_inventory_grid_control(gui.waypoint, craft_orders_as_inventory, "recipe/", self.crafting_queue_item_clicked_callback)
     end
 
     -- item transfer orders
@@ -417,9 +383,9 @@ function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index
                 transfer_direction_sprite = "tas-arrow-left"
             end
 
-            item_transfer_row.reveal_entity_button = tas.gui.build_inventory_item_control(item_transfer_table, { name = order.container_name, count = 0 } , "entity/")
+            item_transfer_row.reveal_entity_button = self:build_inventory_item_control(item_transfer_table, { name = order.container_name, count = 0 } , "entity/")
             item_transfer_table.add { type = "sprite", sprite = transfer_direction_sprite}
-            item_transfer_row.increment_button = tas.gui.build_inventory_item_control(item_transfer_table, order.item_stack, "item/")
+            item_transfer_row.increment_button = self:build_inventory_item_control(item_transfer_table, order.item_stack, "item/")
             item_transfer_row.decrement_button = item_transfer_table.add { type = "sprite-button", sprite = "tas-decrement"--[[, style = "button-style"--]]}
             item_transfer_row.remove_button = item_transfer_table.add { type = "sprite-button", sprite = "tas-cancel"--[[, style = "button-style"--]]}
         end
@@ -429,10 +395,19 @@ function tas.gui.show_waypoint_info(player_index, sequence_index, waypoint_index
     end
 end
 
-function tas.gui.try_handle_waypoint_editor_item_transfer_clicked(event)
+function Gui:waypoint_editor_waypoint_changed_handler(event)
+    local type = event.type
+    local player_index = event.player_index
+    local gui = self.players[player_index]
+    if type == "moved" or type == "order_removed" then
+        self:show_waypoint_editor(player_index, gui.sequence_index, gui.waypoint_index)
+    end
+end
+
+function Gui:try_handle_waypoint_editor_item_transfer_clicked(event)
 
     local button = event.element
-    local waypoint_editor = global.players[event.player_index].gui.waypoint_editor
+    local waypoint_editor = self.players[event.player_index].waypoint_editor
 
     for k, row in ipairs(waypoint_editor.item_transfer_rows) do
         if button == row.reveal_entity_button then
@@ -441,17 +416,17 @@ function tas.gui.try_handle_waypoint_editor_item_transfer_clicked(event)
         elseif button == row.increment_button then
             local num_to_add = util.get_item_stack_split_count(event, row.order.item_stack.name)
             row.order:set_count(row.order:get_count() + num_to_add)
-            tas.gui.refresh(event.player_index)
+            self:refresh(event.player_index)
             return true
         elseif button == row.decrement_button then
             local num_to_remove = util.get_item_stack_split_count(event, row.order.item_stack.name)
             local new_count = math.max(row.order:get_count() - num_to_remove, 1)
             row.order:set_count(new_count)
-            tas.gui.refresh(event.player_index)
+            self:refresh(event.player_index)
             return true
         elseif button == row.remove_button then
             row.order.waypoint:remove_item_transfer_order(row.order.index)
-            tas.gui.refresh(event.player_index)
+            self:refresh(event.player_index)
             return true
         end
     end
@@ -461,7 +436,7 @@ end
 
 -- Transforms a collection of craft_orders to a collection of SimpleItemStack
 -- See http://lua-api.factorio.com/latest/Concepts.html#SimpleItemStack
-function tas.gui.craft_orders_to_inventory(craft_orders)
+function Gui:craft_orders_to_inventory(craft_orders)
     local inventory = { }
     local inventory_index = 1
 
@@ -477,7 +452,7 @@ end
 -- inventory is a collection of SimpleItemStack
 -- on_item_stack_clicked_callback accepts a table with the fields { gui_element, player_index, inventory, item_stack, item_stack_index }
 -- returns the root flow container elemnt for the inventory
-function tas.gui.build_inventory_grid_control(container_frame, inventory, sprite_path_prefix, on_item_stack_clicked_callback)
+function Gui:build_inventory_grid_control(container_frame, inventory, sprite_path_prefix, on_item_stack_clicked_callback)
     if on_item_stack_clicked_callback ~= nil and type(on_item_stack_clicked_callback) ~= "function" then error("Invalid callback type") end
 
 
@@ -485,25 +460,30 @@ function tas.gui.build_inventory_grid_control(container_frame, inventory, sprite
 
     -- item_stack is SimpleItemStack or LuaItemStack. See http://lua-api.factorio.com/latest/Concepts.html#SimpleItemStack
     
+    
+    if on_item_stack_clicked_callback ~= nil then
+        game.print("Update inventory grid callback pls")
+    end
+
     for i = 1, #inventory do
         local item_stack = inventory[i]
         if item_stack.valid_for_read == nil or item_stack.valid_for_read == true then
 
-            local btn = tas.gui.build_inventory_item_control(inventory_container, item_stack, sprite_path_prefix)
+            local btn = self:build_inventory_item_control(inventory_container, item_stack, sprite_path_prefix)
 
-            if on_item_stack_clicked_callback ~= nil then
-                tas.gui.register_click_callback(btn, Delegate.new({
-                    gui_element = btn,
-                    inventory = inventory,
-                    item_stack = item_stack,
-                    item_stack_index = i,
-                    inner_callback = on_item_stack_clicked_callback
-                }, _G, function(closure, env, click_event)
-                    local event = util.clone_table(closure)
-                    event.click_event = click_event
-                    closure.inner_callback(event)
-                end ))
-            end
+            -- if on_item_stack_clicked_callback ~= nil then
+            --     self:register_click_callback(btn, Delegate.new({
+            --         gui_element = btn,
+            --         inventory = inventory,
+            --         item_stack = item_stack,
+            --         item_stack_index = i,
+            --         inner_callback = on_item_stack_clicked_callback
+            --     }, _G, function(closure, env, click_event)
+            --         local event = util.clone_table(closure)
+            --         event.click_event = click_event
+            --         closure.inner_callback(event)
+            --     end ))
+            -- end
 
         end
     end
@@ -511,7 +491,7 @@ function tas.gui.build_inventory_grid_control(container_frame, inventory, sprite
     return inventory_container
 end
 
-function tas.gui.build_inventory_item_control(container, item_stack, sprite_path_prefix)
+function Gui:build_inventory_item_control(container, item_stack, sprite_path_prefix)
     local btn = container.add( { type = "sprite-button", sprite = sprite_path_prefix .. item_stack.name--[[, style = "button-style"--]], name = util.get_guid() })
     if item_stack.count > 0 then
         btn.add( { type = "label", caption = tostring(item_stack.count) })
@@ -519,14 +499,9 @@ function tas.gui.build_inventory_item_control(container, item_stack, sprite_path
     return btn
 end
 
-function tas.gui.mine_order_info_to_localised_string(mine_order)
-    fail_if_missing(mine_order)
-    return { "TAS-mine-order-info", mine_order.get_count(), game.entity_prototypes[mine_order.name].localised_name }
-end
-
-function tas.gui.set_entity_reference_count(num_entity_references)
+function Gui:set_entity_reference_count(num_entity_references)
     for player_index, player in pairs(game.connected_players) do
-        local gui = global.players[player_index].gui
+        local gui = self.players[player_index]
 
         if gui.entity_count == nil then
             gui.entity_count = player.gui.top.add { type = "label", caption = num_entity_references }
@@ -536,124 +511,39 @@ function tas.gui.set_entity_reference_count(num_entity_references)
     end
 end
 
-function tas.gui.refresh(player_index)
+function Gui:refresh(player_index)
     fail_if_missing(player_index)
 
-    local gui = global.players[player_index].gui
+    local gui = self.players[player_index]
 
     if gui.sequence_index ~= nil and gui.waypoint_index ~= nil then
-        tas.gui.show_waypoint_info(player_index, gui.sequence_index, gui.waypoint_index)
+        self:show_waypoint_editor(player_index, gui.sequence_index, gui.waypoint_index)
     end
 
     local entity_editor = gui.entity_editor
-    if entity_editor.root ~= nil and is_valid(entity_editor.entity) and is_valid(entity_editor.character) then
-        tas.gui.show_entity_editor(player_index, entity_editor.entity, entity_editor.character)
+    if entity_editor.root ~= nil and is_valid(entity_editor.entity) then
+        self:show_entity_editor(player_index, entity_editor.entity, entity_editor.character)
     end
 end
 
---[Comment]
---Invokes `callback(event)` when a LuaGuiElement `element` is clicked.
---argument `event` is a table that contains:
----element :: LuaGuiElement: The clicked element.
----player_index :: uint: The player who did the clicking.
-function tas.gui.register_click_callback(element, callback)
-    fail_if_missing(element)
-    fail_if_missing(callback)
+function Gui:on_click(event)
+    -------------------------------------------------------------
+    -- deprecated, use GuiEvents instead of adding callbacks here
+    -------------------------------------------------------------
 
-    local callbacks = global.gui.click_event_callbacks
-
-    if element.name == "" or callbacks[element.name] ~= nil then
-        error("Element name must be a unique string. Use util.get_guid()!")
-    end
-
-    callbacks[element.name] = callback
-end
-
---[Comment]
---tas.gui.unregister_click_callbacks(element_1, element_2, ...) or int indexed array
-function tas.gui.unregister_click_callbacks(...)
-    fail_if_missing(...)
-
-    for _, element in ipairs(...) do
-        global.gui.click_event_callbacks[element.name] = nil
-    end
-end
-
-function tas.gui.register_check_changed_callback(checkbox_element, callback)
-    fail_if_missing(checkbox_element)
-    fail_if_missing(callback)
-
-    local callbacks = global.gui.check_changed_callbacks
-
-    if checkbox_element.name == "" or callbacks[checkbox_element.name] ~= nil then
-        error("Element name must be a unique string. Use util.get_guid()!")
-    end
-
-    callbacks[checkbox_element.name] = callback
-end
-
-function tas.gui.unregister_check_changed_callbacks(...)
-    fail_if_missing(...)
-
-    for _, element in ipairs(...) do
-        global.gui.check_changed_callbacks[element.name] = nil
-    end
-end
-
-function tas.gui.register_dropdown_selection_changed_callback(dropdown_element, callback)
-    fail_if_missing(dropdown_element)
-    fail_if_missing(callback)
-
-    local callbacks = global.gui.dropdown_selection_state_changed_callbacks
-
-    if dropdown_element.name == "" or callbacks[dropdown_element.name] ~= nil then
-        error("Element name must be a unique string. Use util.get_guid()!")
-    end
-
-    callbacks[dropdown_element.name] = callback
-end
-
-function tas.gui.unregister_dropdown_selection_changed_callbacks(...)
-    fail_if_missing(...)
-
-    for _, element in ipairs(...) do
-        global.gui.dropdown_selection_state_changed_callbacks[element.name] = nil
-    end
-end
-
-function tas.gui.on_dropdown_selection_changed(event)
-    fail_if_missing(event)
-
-    local element = event.element
-    local player_index = event.player_index
-
-    local callback = global.gui.dropdown_selection_state_changed_callbacks[element.name]
-    if callback ~= nil then
-        callback(element, player_index)
-    end
-end
-
-function tas.gui.on_click(event)
     fail_if_missing(event)
     local element = event.element
     local player_index = event.player_index
     local player = game.players[player_index]
-    local gui = global.players[player_index].gui
-
-    local waypoints = gui.waypoints
-
-    local callback = global.gui.click_event_callbacks[element.name]
-    if callback ~= nil then
-        callback(event)
-    end
+    local gui = self.players[player_index]
 
     if element == gui.editor_visible_toggle then
         tas.ensure_cheat_mode_enabled(player_index)
         tas.ensure_first_sequence_initialized()
-        tas.gui.toggle_editor_visible(player_index)
+        self:toggle_editor_visible(player_index)
     elseif element == gui.waypoint_mode then
         if gui.current_state == "move" then
-            tas.gui.reset_waypoint_toggles(player_index)
+            self:reset_waypoint_toggles(player_index)
             gui.current_state = nil
         else
             gui.current_state = "move"
@@ -674,18 +564,8 @@ function tas.gui.on_click(event)
         if num_ticks ~= nil then
             global.playback_controller:play(player, num_ticks)
         end
-    elseif tas.gui.try_handle_waypoint_editor_item_transfer_clicked(event) == true then
+    elseif self:try_handle_waypoint_editor_item_transfer_clicked(event) == true then
         -- handled
-    end
-end
-
-function tas.gui.on_check_changed(event)
-    fail_if_missing(event)
-
-    local element = event.element
-    local callback = global.gui.check_changed_callbacks[element.name]
-    if callback ~= nil then
-        callback(element, player_index)
     end
 end
 

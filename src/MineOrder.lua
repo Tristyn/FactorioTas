@@ -1,3 +1,14 @@
+local Event = require("Event")
+
+--- MineOrder.changed event:
+-- This event is invoked every time the MineOrder count changes.
+-- Parameters
+-- sender: The MineOrder that triggered the callback.
+-- type :: string: Can be any of [count]
+-- Additional type specific parameters:
+-- -- count
+-- -- -- old_count: int64
+
 local MineOrder = { }
 local metatable = { __index = MineOrder }
 
@@ -10,7 +21,8 @@ function MineOrder.new_from_entity(entity)
     {
         position = entity.position,
         surface_name = entity.surface.name,
-        name = entity.name,
+		name = entity.name,
+		changed = Event.new(),
         _count = 1,
 	}
 	
@@ -34,7 +46,6 @@ function MineOrder:to_template()
 	template.waypoint = nil
 	return template
 end
-
 
 function MineOrder:assign_waypoint(waypoint, index)
 	if self.waypoint ~= nil then
@@ -72,7 +83,15 @@ function MineOrder:set_count(value)
 		error("Setting a count is only valid for entities of type 'resource'")
 	end
 
+	local old_count = self._count
+
 	self._count = value
+
+	self.changed:invoke({
+		sender = self,
+		type = "count",
+		old_count = old_count
+	})
 end
 
 function MineOrder:get_count()
@@ -187,6 +206,12 @@ function MineOrder:mine(character)
 	local entity = self:get_entity()
 	character.update_selected_entity(entity.position)
 	return character.mine_entity(entity)
+end
+
+--[Comment]
+-- Gets a localized string, which is a table that factorio uses to generate localization
+function MineOrder:to_localised_string()
+    return { "TAS-mine-order-info", mine_order.get_count(), game.entity_prototypes[mine_order.name].localised_name }
 end
 
 return MineOrder

@@ -37,12 +37,12 @@ function fail_if_invalid(entity, msg)
     return false
 end
 
-
-local tas = require("tas")
+local tas = require("tas");
 
 require("math")
 require("util")
-require("gui")
+local Gui = require("gui")
+local GuiEvents = require("GuiEvents")
 
 inspect = require("inspect")
 json = require("JSON")
@@ -52,12 +52,13 @@ require("modpack.control")
 script.on_init( function()
     -- Dont capture and print error, players won't see it as they haven't been added to the game
     -- Instead collect the traceback in err and rethrow.
-    local _, err = xpcall(function() 
+    local _, err = xpcall(function()
         tas.init_globals()
         util.init_globals()
-        tas.gui.init_globals()
+        global.gui_events = GuiEvents.new()
+        global.gui = Gui.new(global.gui_events)
 
-        tas.set_metatable()
+        tas.set_metatable() -- this shouldn't be needed riiiight? just on load
     end, debug.traceback, event)
 
     if err then
@@ -70,31 +71,35 @@ script.on_load( function()
     -- (resulting in loss of the initial stacktrace).
     -- Instead collect the traceback in err and rethrow to display it in the main menu.
     local _, err = xpcall(function() 
-        tas.set_metatable()
+        Gui.set_metatable(global.gui)
     end, debug.traceback, event)
     
     if err then
         error(err)
     end
-end)
+end )
 
 script.on_event(defines.events.on_player_created, function(event)
-    local _, err = xpcall(tas.on_player_created, debug.traceback, event)
+    local _, err = xpcall(function(event) global.gui:init_player(event.player_index) end, debug.traceback, event)
     if err then game.print( { "TAS-err-specific", "on_player_created", err }) end
 end )
 
 script.on_event(defines.events.on_gui_click, function(event)
-    local _, err = xpcall(tas.gui.on_click, debug.traceback, event)
+    local _, err = xpcall(function (...)
+        global.gui_events:on_click(event)
+        -- gui:on_click is deprecated, use gui_events in the future
+        global.gui:on_click(event)
+    end, debug.traceback, event)
     if err then game.print( { "TAS-err-specific", "on_gui_click", err }) end
 end )
 
 script.on_event(defines.events.on_gui_checked_state_changed, function(event)
-    local _, err = xpcall(tas.gui.on_check_changed, debug.traceback, event)
+    local _, err = xpcall(function (...) global.gui_events:on_check_changed(event) end, debug.traceback, event)
     if err then game.print( { "TAS-err-specific", "on_check_changed", err }) end
 end )
 
 script.on_event(defines.events.on_gui_selection_state_changed, function(event)
-    local _, err = xpcall(tas.gui.on_dropdown_selection_changed, debug.traceback, event)
+    local _, err = xpcall(function (...) global.gui_events:on_dropdown_selection_changed(event) end, debug.traceback, event)
     if err then game.print( { "TAS-err-specific", "on_dropdown_selection_changed", err }) end
 end )
 

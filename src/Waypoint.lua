@@ -8,12 +8,15 @@ local Template = require("Template")
 --- Waypoint.changed event:
 -- This event is invoked every time any order is added or removed or the waypoint position and surface changes.
 -- Parameters
--- sender :: The waypoint that triggered the callback.
--- type :: string: Can be any of [moved]
+-- sender: The waypoint that triggered the callback.
+-- type :: string: Can be any of [moved|order_removed]
 -- Additional type specific parameters:
 -- -- moved
 -- -- -- old_surface_name :: string
 -- -- -- old_position :: table: {x , y}
+-- -- order_removed
+-- -- -- order_type: reference to [MineOrder|BuildOrder|..]
+-- -- -- order :: the order of type order_type
 
 local Waypoint = { }
 local metatable = { __index = Waypoint }
@@ -211,7 +214,7 @@ function Waypoint:add_build_order_from_ghost_entity(ghost_entity)
 end
 
 function Waypoint:remove_build_order(index)
-	self:_remove_order(self.build_orders, index)
+	self:_remove_order(self.build_orders, BuildOrder, index)
 end
 
 function Waypoint:add_mine_order_from_entity(entity)
@@ -224,7 +227,7 @@ function Waypoint:add_mine_order_from_entity(entity)
 end
 
 function Waypoint:remove_mine_order(index)
-	self:_remove_order(self.mine_orders, index)
+	self:_remove_order(self.mine_orders, MineOrder, index)
 end
 
 function Waypoint:add_craft_order(recipe_name, count)
@@ -253,7 +256,7 @@ function Waypoint:add_craft_order(recipe_name, count)
 end
 
 function Waypoint:remove_craft_order(index)
-	self:_remove_order(self.craft_orders, index)
+	self:_remove_order(self.craft_orders, CraftOrder, index)
 end
 
 function Waypoint:add_item_transfer_order(is_player_receiving, player_inventory_index, container_entity, container_inventory_index, items_to_transfer)
@@ -274,7 +277,7 @@ function Waypoint:add_item_transfer_order(is_player_receiving, player_inventory_
 end
 
 function Waypoint:remove_item_transfer_order(index)
-	self:_remove_order(self.item_transfer_orders, index)
+	self:_remove_order(self.item_transfer_orders, ItemTransferOrder, index)
 end
 
 --[Comment]
@@ -289,7 +292,7 @@ function Waypoint:_try_merge_item_transfer_order_with_collection(order)
 	end
 end
 
-function Waypoint:_remove_order(order_collection, index)
+function Waypoint:_remove_order(order_collection, order_type, index)
 	fail_if_missing(order_collection)
 	fail_if_missing(index)
 
@@ -297,11 +300,18 @@ function Waypoint:_remove_order(order_collection, index)
 		error("index out of range")
 	end
 	
-	table.remove(order_collection, index)
+	local order = table.remove(order_collection, index)
 
 	for i = index, #order_collection do
 		order_collection[i]:set_index(i)
 	end
+
+	self.changed:invoke {
+		sender = self,
+		type = "order_removed",
+		order_type = order_type,
+		order = order
+	}
 end
 
 function Waypoint:move(surface_name, position)
@@ -351,7 +361,7 @@ function Waypoint:_move(surface_name, position, new_entity)
 		old_position = old_position
 	}
 
-	self:_changed(event)
+	self.changed:invoke(event)
 end
 
 function Waypoint:set_highlight(highlighted)
@@ -375,21 +385,6 @@ end
 
 function Waypoint:has_character_arrived(character)
 	return self:get_direction(character) == nil
-end
-
-function Waypoint:_changed(event)
-	self.changed:invoke(event)
-end
-
---[Comment]
--- Returns a collection containing lists of orders that are within this Waypoint.
-function Waypoint:_get_order_collections()
-	return {
-		self.build_orders,
-		self.mine_orders,
-		self.craft_orders,
-		self.item_transfer_orders
-	}
 end
 
 function Waypoint:destroy()

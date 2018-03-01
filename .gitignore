@@ -13,6 +13,7 @@ lib/factorio_0.*/player-data.json
 lib/factorio_0.*/mods/mod-list.json
 lib/factorio_0.*/mods/FactorioTas_*
 lib/factorio_0.*/saves
+lib/factorio_0.*/*.dmp
 
 lib/factorio_0.*/temp
 

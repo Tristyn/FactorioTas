@@ -31,6 +31,7 @@ function SequenceIndexer.new()
 
 		sequence_changed = Event.new(),
 		waypoint_changed = Event.new(),
+		mine_order_changed = Event.new(),
 		changed = Event.new()
 	}
 

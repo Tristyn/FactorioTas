@@ -3,14 +3,12 @@ local Waypoint = require("Waypoint")
 local Sequence = require("Sequence")
 local SequenceIndexer = require("SequenceIndexer")
 local PlaybackController = require("PlaybackController")
-local Gui = require("Gui")
 
 local tas = { }
 
 function tas.init_globals()
     global.sequence_indexer = SequenceIndexer.new()
     global.playback_controller = PlaybackController.new()
-    global.gui = Gui.new()
     global.players = { }
     global.arrow_auto_update_repository = { }
 
@@ -20,11 +18,9 @@ end
 function tas.set_metatable()
     SequenceIndexer.set_metatable(global.sequence_indexer)
     PlaybackController.set_metatable(global.playback_controller)
-    Gui.set_metatable(global.gui)
 end
 
-function tas.on_player_created(event)
-    local player_index = event.player_index
+function tas.init_player(player_index)
     global.players[player_index] =
     {
         hover_arrows = { }
@@ -36,8 +32,6 @@ function tas.on_player_created(event)
     if #global.sequence_indexer.sequences > 0 then
         tas.select_waypoint(global.sequence_indexer.sequences[1].waypoints[1])
     end
-
-    tas.gui.init_player(player_index)
 end
 
 -- Creates and returns a static text entity that never despawns.
@@ -337,12 +331,12 @@ function tas.select_waypoint(player_index, waypoint)
     player.waypoint = waypoint
 
     if waypoint == nil then
-        tas.gui.hide_waypoint_info(player_index)
+        global.gui:hide_waypoint_editor(player_index)
     else
         -- Create the 'highlight' entity
         waypoint:set_highlight(true)
 
-        tas.gui.show_waypoint_info(player_index, waypoint.sequence.index, waypoint.index)
+        global.gui:show_waypoint_editor(player_index, waypoint.sequence.index, waypoint.index)
     end
 end
 
@@ -375,16 +369,6 @@ function tas.on_built_waypoint(created_entity, player_index)
         tas.insert_waypoint(created_entity, player_index)
     end
     
-end
-
-function tas.set_mine_order_count(mine_order, new_count)
-    local indexes = tas.get_mine_order_indexes(mine_order)
-
-    if indexes == nil then return false end
-
-    mine_order:set_count(new_count)
-
-    -- make calls into runner to synchronize changes
 end
 
 function tas.destroy_mine_order(mine_order)
@@ -461,7 +445,7 @@ function tas.on_pre_mined_resource(player_index, resource_entity)
         resource_entity.amount = resource_entity.amount + 1
     end        
 
-    tas.gui.refresh(player_index)
+    global.gui:refresh(player_index)
 end
 
 function tas.remove_waypoint(waypoint_entity)
@@ -565,7 +549,7 @@ function tas.on_crafted_item(event)
     
     util.remove_item_stack(player_entity.character, item_stack, constants.character_inventories, player_entity)
     player.waypoint:add_craft_order(recipe.name, item_stack.count / recipe.products[1].amount)
-    tas.gui.refresh(player_index)
+    global.gui:refresh(player_index)
 
 end
 
@@ -581,7 +565,7 @@ function tas.on_clicked_ghost(player_index, ghost_entity)
     if tas.is_waypoint_selected(player_index) == false then
         local build_order_indexes = tas.find_build_order_from_entity(ghost_entity)
         if build_order_indexes == nil then 
-            game.print("no build order") 
+            game.print("no build order for this ghost") 
             return 
         end
         tas.select_waypoint(player_index, build_order_indexes.waypoint)
@@ -600,7 +584,7 @@ function tas.show_entity_editor(player_index, entity)
 
     local sequence = global.players[player_index].waypoint.sequence
     local character = global.playback_controller:try_get_character(sequence)
-    tas.gui.show_entity_editor(player_index, entity, character)
+    global.gui:show_entity_editor(player_index, entity, character)
 end
 
 function tas.on_left_click(event)
@@ -653,8 +637,7 @@ function tas.update_player_hover(player, player_entity)
 
         local waypoint = global.sequence_indexer:find_waypoint_from_entity(selected)
         if waypoint == nil then
-            error("Orphan waypoint" )
-            return
+            error("Orphan waypoint")
         end
 
         -- create arrows to waypoints adjacent to this one
