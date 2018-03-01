@@ -39,15 +39,11 @@ end
 
 local tas = require("tas");
 
-require("math")
 require("util")
 local Gui = require("gui")
 local GuiEvents = require("GuiEvents")
 
 inspect = require("inspect")
-json = require("JSON")
-
-require("modpack.control")
 
 script.on_init( function()
     -- Dont capture and print error, players won't see it as they haven't been added to the game

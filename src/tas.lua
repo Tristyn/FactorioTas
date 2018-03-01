@@ -258,60 +258,6 @@ function tas.find_mine_orders_from_entity(entity)
     return found
 end
 
-function tas.get_mine_order_indexes(mine_order)
-    for sequence_index, sequence in ipairs(global.sequence_indexer.sequences) do
-        for waypoint_index, waypoint in ipairs(sequence.waypoints) do
-            local mine_order_index = tas.scan_table_for_value(waypoint.mine_orders, function(order) return order end, mine_order)
-            if mine_order_index ~= nil then
-                return
-                {
-                    sequence = sequence,
-                    sequence_index = sequence_index,
-                    waypoint = waypoint,
-                    waypoint_index = waypoint_index,
-                    mine_order_index = mine_order_index
-                }
-            end
-        end
-    end
-end
-
-function tas.get_craft_order_indexes(craft_order)
-    for sequence_index, sequence in ipairs(global.sequence_indexer.sequences) do
-        for waypoint_index, waypoint in ipairs(sequence.waypoints) do
-            local craft_order_index = tas.scan_table_for_value(waypoint.craft_orders, function(order) return order end, craft_order)
-            if craft_order_index ~= nil then
-                return
-                {
-                    sequence = sequence,
-                    sequence_index = sequence_index,
-                    waypoint = waypoint,
-                    waypoint_index = waypoint_index,
-                    craft_order_index = craft_order_index
-                }
-            end
-        end
-    end
-end
-
-function tas.get_item_transfer_order_indexes(item_transfer_order)
-    for sequence_index, sequence in ipairs(global.sequence_indexer.sequences) do
-        for waypoint_index, waypoint in ipairs(sequence.waypoints) do
-            local item_transfer_order_index = tas.scan_table_for_value(waypoint.item_transfer_orders, function(order) return order end, item_transfer_order)
-            if item_transfer_order_index ~= nil then
-                return
-                {
-                    sequence = sequence,
-                    sequence_index = sequence_index,
-                    waypoint = waypoint,
-                    waypoint_index = waypoint_index,
-                    item_transfer_order_index = item_transfer_order_index
-                }
-            end
-        end
-    end
-end
-
 function tas.is_waypoint_selected(player_index)
     return global.players[player_index].waypoint ~= nil
 end
@@ -372,9 +318,6 @@ function tas.on_built_waypoint(created_entity, player_index)
 end
 
 function tas.destroy_mine_order(mine_order)
-    local indexes = tas.get_mine_order_indexes(mine_order)
-
-    if indexes == nil then return false end
 
     if mine_order.waypoint == nil then
         error("Orphan mine order")
