@@ -9,12 +9,12 @@ local Template = require("Template")
 -- This event is invoked every time any order is added or removed or the waypoint position and surface changes.
 -- Parameters
 -- sender: The waypoint that triggered the callback.
--- type :: string: Can be any of [moved|order_removed]
+-- type :: string: Can be any of [moved|order_removed|order_added]
 -- Additional type specific parameters:
 -- -- moved
 -- -- -- old_surface_name :: string
 -- -- -- old_position :: table: {x , y}
--- -- order_removed
+-- -- order_removed|order_added
 -- -- -- order_type: reference to [MineOrder|BuildOrder|..]
 -- -- -- order :: the order of type order_type
 
@@ -143,13 +143,12 @@ function Waypoint:set_index(index)
 	self.index = index
 end
 
-function Waypoint:to_string()
-	return self.position.x .. '_' .. self.position.y .. '_' .. self.surface_name .. '_' .. "tas-waypoint" 
+function Waypoint:get_entity_id()
+	return self.position.x .. '_' .. self.position.y .. '_' .. self.surface_name .. '_' .. "tas-waypoint"
 end
 
-function Waypoint.entity_to_string(waypoint_entity)
-
-	return waypoint_entity.position.x .. '_' .. waypoint_entity.position.y .. '_' .. waypoint_entity.surface.name .. '_' .. "tas-waypoint" 
+function Waypoint.id_from_entity(waypoint_entity)
+	return util.entity.get_entity_id(waypoint_entity)
 end
 
 function Waypoint:get_entity()

@@ -1,4 +1,14 @@
 local mt = require("persistent_mt")
+local Event = require("Event")
+
+--- CraftOrder.changed event:
+-- This event is invoked every time the CraftOrder count changes.
+-- Parameters
+-- sender: The CraftOrder that triggered the callback.
+-- type :: string: Can be any of [count]
+-- Additional type specific parameters:
+-- -- count
+-- -- -- old_count: int64
 
 local CraftOrder = { }
 local metatable = { __index = CraftOrder }
@@ -6,6 +16,7 @@ mt.init(CraftOrder, "CraftOrder", metatable)
 
 function CraftOrder.set_metatable(instance)
     mt.bless(instance, metatable)
+    Event.set_metatable(instance)
 end
 
 function CraftOrder.new(recipe_name, count)
@@ -15,6 +26,7 @@ function CraftOrder.new(recipe_name, count)
     local new =
     {
         recipe_name = recipe_name,
+        changed = Event.new()
     }
 
     CraftOrder.set_metatable(new)
@@ -60,7 +72,18 @@ end
 
 function CraftOrder:set_count(value)
     if value < 1 then error() end
+    
+    local old_count = self._count
+
     self._count = value
+
+    if old_count ~= nil then
+        self.changed:invoke({
+            sender = self,
+            type = "count",
+            old_count = old_count
+        })
+    end
 end
 
 --[Comment]

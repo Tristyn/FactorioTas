@@ -28,7 +28,7 @@ function Dispatcher.new()
 end
 
 function Dispatcher:add_order(transfer_order)
-	local entity_string = transfer_order:container_to_string()
+	local entity_string = transfer_order:get_entity_id()
 	local order_group = self.orders_grouped_by_entity[entity_string]
 	if order_group == nil then
 		order_group = { }
@@ -56,7 +56,7 @@ function Dispatcher:find_orders_for_container(player)
 end
 
 function Dispatcher:remove_order(transfer_order)
-	local order_group = self.orders_grouped_by_entity[transfer_order:container_to_string()]
+	local order_group = self.orders_grouped_by_entity[transfer_order:get_entity_id()]
 	
 	if order_group == nil then error() end
 	if order_group[transfer_order] == nil then error() end

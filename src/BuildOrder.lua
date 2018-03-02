@@ -68,6 +68,14 @@ function BuildOrder:set_index(index)
     self.index = index
 end
 
+function BuildOrder:get_entity_id()
+    return self.position.x .. "_" .. self.position.y .. "_" .. self.surface.name .. "_" .. self.name
+end
+
+function BuildOrder.id_from_entity(build_order_entity)
+    return util.entity.get_entity_id(build_order_entity)
+end
+
 function BuildOrder:get_entity()
     return util.find_entity(self.surface_name, self.name, self.position)
 end

@@ -396,8 +396,16 @@ end
 --[Comment]
 -- Returns a string representation of `entity` which can be used as a table index.
 -- If fields position and surface are changed then the index is stale state.
-function util.entity.to_string(entity)
-    return entity.position.x .. '_' .. entity.position.y .. '_' .. entity.surface.name .. '_' .. entity.name
+function util.entity.get_entity_id(entity)
+    fail_if_invalid(entity)
+    local name
+    if entity.type ~= "entity-ghost" then
+        name = entity.name
+    else
+        name = entity.ghost_name
+    end
+
+    return entity.position.x .. '_' .. entity.position.y .. '_' .. entity.surface.name .. '_' .. name
 end
 
 function util.find_entity(surface_name, entity_name, position)

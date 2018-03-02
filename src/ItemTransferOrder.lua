@@ -70,11 +70,19 @@ function ItemTransferOrder:set_index(index)
 	self.index = index
 end
 
+function ItemTransferOrder:get_entity_id()
+    return self.container_position.x .. "_" .. self.container_position.y .. "_" .. self.container_surface.name .. "_" .. self.container_name
+end
+
+function ItemTransferOrder.entity_to_string(item_transfer_container)
+	return util.entity.get_entity_id(item_transfer_container)
+end
+
 function ItemTransferOrder:get_entity()
 	return util.find_entity(self.container_surface_name, self.container_name, self.container_position)
 end
 
-function ItemTransferOrder:container_to_string()
+function ItemTransferOrder:get_entity_id()
 	return self.container_surface_name .. "_" .. self.container_name .. "_" .. self.container_position.x .. "_" .. self.container_position.y
 end
 

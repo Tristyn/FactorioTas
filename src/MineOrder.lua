@@ -63,6 +63,14 @@ function MineOrder:set_index(index)
     self.index = index
 end
 
+function MineOrder:get_entity_id()
+    return self.position.x .. "_" .. self.position.y .. "_" .. self.surface.name .. "_" .. self.name
+end
+
+function MineOrder.id_from_entity(mine_order_entity)
+    return util.entity.get_entity_id(mine_order_entity)
+end
+
 function MineOrder:get_entity()
 	return util.find_entity(self.surface_name, self.name, self.position)
 end
