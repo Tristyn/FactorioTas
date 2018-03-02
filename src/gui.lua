@@ -111,12 +111,6 @@ function Gui:toggle_editor_visible(player_index)
     end
 end
 
-function Gui:reset_waypoint_toggles(player_index)
-    fail_if_missing(player_index)
-
-    self.players[player_index].waypoint_mode.caption = "insert waypoint"
-end
-
 function Gui:hide_entity_editor(player_index)
     fail_if_missing(player_index)
 
@@ -297,9 +291,8 @@ function Gui:hide_waypoint_editor(player_index)
 
     if gui.sequence_index ~= nil and gui.waypoint_index ~= nil then 
         local waypoint = global.sequence_indexer.sequences[gui.sequence_index].waypoints[gui.waypoint_index]
-        waypoint.changed:remove(self, "waypoint_editor_waypoint_changed_handler")
+        waypoint.changed:remove(self, "handle_waypoint_editor_waypoint_changed")
     end
-
 
     if gui.waypoint ~= nil then
 
@@ -345,7 +338,7 @@ function Gui:show_waypoint_editor(player_index, sequence_index, waypoint_index)
     local container_frame = gui.waypoint_container.add { type = "frame", direction = "vertical", caption = "Waypoint # " .. waypoint_index }
     gui.waypoint = container_frame.add { type = "table", column_count = 1}
 
-    waypoint.changed:add(self, "waypoint_editor_waypoint_changed_handler")
+    waypoint.changed:add(self, "handle_waypoint_editor_waypoint_changed")
 
     -- delay
 
@@ -395,12 +388,25 @@ function Gui:show_waypoint_editor(player_index, sequence_index, waypoint_index)
     end
 end
 
-function Gui:waypoint_editor_waypoint_changed_handler(event)
+function Gui:handle_waypoint_editor_waypoint_changed(event)
     local type = event.type
-    local player_index = event.player_index
-    local gui = self.players[player_index]
+    local waypoint = event.sender
+    local waypoint_index = waypoint.index
+    local sequence_index = waypoint.sequence.index
+
     if type == "moved" or type == "order_removed" then
-        self:show_waypoint_editor(player_index, gui.sequence_index, gui.waypoint_index)
+
+        -- this is a big ol' hack. Cause we don't readily know the players that
+        -- have this waypoint in the editor, we gotta iterate all of them.
+        -- The fix is to make the callback object contain the needed info
+        -- (as in make the WaypointEditor a view that subscribes to changes)
+        for player_index, _ in pairs(game.connected_players) do
+            local gui = self.players[player_index]
+            if gui.sequence_index == sequence_index and gui.waypoint_index == waypoint_index then
+                self:show_waypoint_editor(player_index, gui.sequence_index, gui.waypoint_index)
+            end
+        end
+
     end
 end
 
@@ -542,12 +548,14 @@ function Gui:on_click(event)
         tas.ensure_first_sequence_initialized()
         self:toggle_editor_visible(player_index)
     elseif element == gui.waypoint_mode then
-        if gui.current_state == "move" then
-            self:reset_waypoint_toggles(player_index)
-            gui.current_state = nil
+        if gui.current_waypoint_build_mode == "move" then
+            gui.current_waypoint_build_mode = "insert"
+            gui.waypoint_mode.caption = "insert waypoint"
+            tas.set_waypoint_build_mode(player_index, "insert")
         else
-            gui.current_state = "move"
+            gui.current_waypoint_build_mode = "move"
             gui.waypoint_mode.caption = "move waypoint"
+            tas.set_waypoint_build_mode(player_index, "move")
         end
     elseif element == gui.playback.play_pause then
         if element.caption == "play" then

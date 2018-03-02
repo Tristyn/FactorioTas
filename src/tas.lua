@@ -3,6 +3,7 @@ local Waypoint = require("Waypoint")
 local Sequence = require("Sequence")
 local SequenceIndexer = require("SequenceIndexer")
 local PlaybackController = require("PlaybackController")
+local Arrow = require("Arrow")
 
 local tas = { }
 
@@ -10,7 +11,6 @@ function tas.init_globals()
     global.sequence_indexer = SequenceIndexer.new()
     global.playback_controller = PlaybackController.new()
     global.players = { }
-    global.arrow_auto_update_repository = { }
 
     global.sequence_indexer.sequence_changed:add(tas, "_on_sequence_changed")
 end
@@ -23,7 +23,8 @@ end
 function tas.init_player(player_index)
     global.players[player_index] =
     {
-        hover_arrows = { }
+        hover_arrows = { },
+        waypoint_build_mode = "insert"
     }
 
     tas.ensure_true_spawn_position_set(game.players[player_index])
@@ -49,99 +50,6 @@ function tas.create_static_text(surface, position, content, color)
     text.active = false
 
     return text
-end
-
---[Comment]
--- Creates a new arrow facade instance that displays a beam onscreen between two entities.
--- Other methods can control its lifetime.
-function tas.create_arrow(source_entity, target_entity)
-
-    -- Note: The arrow is drawn using a beam entity, which requries the source and target to have health.
-    -- A beam can be drawn to any entity by using an invisible proxy entity when necessary
-    -- Proxy entity positions have to be updated manually in that case.
-
-
-    local arrow_facade =
-    {
-        source = source_entity,
-        target = target_entity,
-        disposed = false
-    }
-    
-    local arrow_builder = {
-        name = "tas-arrow",
-        position = { 0, 0 },
-        -- source and target entities may be the proxies created earlier
-        source = source_entity,
-        target = target_entity
-    }
-
-    -- determine if we should wrap the source and target entities for the beam entity
-    -- References to these will be saved in the arrow_facade for proper cleanup later
-
-    -- This pcall returns true if the entity has health, false if the call threw an exception accessing the field
-    if pcall( function() if type(arrow_facade.source.health) ~= "float" then error() end end) == false then
-        arrow_facade.source_proxy = arrow_facade.source.surface.create_entity( {
-            name = "tas-arrow-proxy",
-            position = source_entity.position
-        } )
-        arrow_builder.source = arrow_facade.source_proxy
-    end
-
-    if pcall( function() if type(arrow_facade.target.health) ~= "float" then error() end end) == false then
-        arrow_facade.target_proxy = arrow_facade.target.surface.create_entity( {
-            name = "tas-arrow-proxy",
-            position = target_entity.position
-        } )
-        arrow_builder.target = arrow_facade.target_proxy
-    end
-
-    arrow_facade.beam = source_entity.surface.create_entity(arrow_builder)
-
-    return arrow_facade
-end
-
--- [Comment]
--- Ensures that the arrows position matches that of the source and target entities.
--- Returns true if the beam still exists in the game world, otherwise false.
-function tas.update_arrow(arrow_facade)
-
-    if arrow_facade.disposed == true then
-        error("Attempted to update an arrow that has been destroyed. Throwing to warn of a resource leak")
-    end
-
-    -- update the proxy entities positions so that the beam entity draws in the correct position
-
-    if arrow_facade.source_proxy ~= nil and arrow_facade.source_proxy.valid == true and arrow_facade.source.valid == true then
-        arrow_facade.source_proxy.teleport(arrow_facade.source.position)
-    end
-
-    if arrow_facade.target_proxy ~= nil and arrow_facade.target_proxy.valid == true and arrow_facade.target.valid == true then
-        arrow_facade.target_proxy.teleport(arrow_facade.target.position)
-    end
-
-end
-
--- [Comment]
--- Destroys any internal entities and renders the object useless.
--- Subsequent calls to other instance methods will result in an error.
--- instance field disposed will return true
-function tas.destroy_arrow(arrow_facade)
-    arrow_facade.disposed = true
-
-    if arrow_facade.source_proxy ~= nil and arrow_facade.source_proxy.valid == true then
-        arrow_facade.source_proxy.destroy()
-    end
-
-    if arrow_facade.target_proxy ~= nil and arrow_facade.target_proxy.valid == true then
-        arrow_facade.target_proxy.destroy()
-    end
-
-    -- beam should never be nil
-    if arrow_facade.beam.valid == true then
-        arrow_facade.beam.destroy()
-    end
-
 end
 
 function tas.ensure_true_spawn_position_set(freshly_spawned_player)
@@ -309,12 +217,19 @@ function tas.on_built_waypoint(created_entity, player_index)
         error()
     end
 
-    if player.gui.current_state == "move" then
+    if player.waypoint_build_mode == "move" then
         selected_waypoint:move_to_entity(created_entity)
     else
         tas.insert_waypoint(created_entity, player_index)
     end
     
+end
+
+function tas.set_waypoint_build_mode(player_index, mode)
+    if mode ~= "move" and mode ~= "insert" then
+        error()
+    end
+    global.players[player_index].waypoint_build_mode = mode
 end
 
 function tas.destroy_mine_order(mine_order)
@@ -549,10 +464,6 @@ function tas.on_left_click(event)
 end
 
 function tas.update_player_hover(player, player_entity)
-    -- delete arrow collection
-    for _, arrow in ipairs(player.hover_arrows) do
-        tas.destroy_arrow(arrow)
-    end
 
     player.hover_arrows = { }
 
@@ -565,15 +476,20 @@ function tas.update_player_hover(player, player_entity)
         return
     end
 
+    -- delete arrow collection
+    for _, arrow in ipairs(player.hover_arrows) do
+        arrow:destroy()
+    end
+    player.hover_arrows = { }
+
     -- check if it's a build order
     local find_result = tas.find_build_order_from_entity(selected)
     if find_result ~= nil then
         local build_order_entity = find_result.build_order:get_entity()
         local waypoint_entity = find_result.waypoint:get_entity()
         if is_valid(build_order_entity) and is_valid(waypoint_entity) then
-            local arrow = tas.create_arrow(build_order_entity, waypoint_entity)
-            tas.insert_arrow_into_auto_update_respository(arrow)
-            table.insert(player.hover_arrows, arrow)
+            local arrow = Arrow.new(build_order_entity, waypoint_entity)
+            player.hover_arrows[arrow] = arrow
         end
         return
     elseif selected.name == "tas-waypoint" then
@@ -588,9 +504,8 @@ function tas.update_player_hover(player, player_entity)
         if prev ~= nil then
             local prev_waypoint_entity = prev:get_entity() 
             if is_valid(prev_waypoint_entity) then
-                local arrow = tas.create_arrow(prev_waypoint_entity, selected)
-                tas.insert_arrow_into_auto_update_respository(arrow)
-                table.insert(player.hover_arrows, arrow)
+                local arrow = Arrow.new(prev_waypoint_entity, selected)
+                player.hover_arrows[arrow] = arrow
             end
         end
 
@@ -598,9 +513,8 @@ function tas.update_player_hover(player, player_entity)
         if next_ ~= nil then
             local next_waypoint_entity = next_:get_entity()
             if is_valid(next_waypoint_entity) then
-                local arrow = tas.create_arrow(selected, next_waypoint_entity)
-                tas.insert_arrow_into_auto_update_respository(arrow)
-                table.insert(player.hover_arrows, arrow)
+                local arrow = Arrow.new(selected, next_waypoint_entity)
+                player.hover_arrows[arrow] = arrow
             end
         end
 
@@ -608,9 +522,8 @@ function tas.update_player_hover(player, player_entity)
         for _, mine_order in ipairs(waypoint.mine_orders) do
             local mine_order_entity = mine_order:get_entity()
             if is_valid(mine_order_entity) then
-                local arrow = tas.create_arrow(selected, mine_order_entity)
-                tas.insert_arrow_into_auto_update_respository(arrow)
-                table.insert(player.hover_arrows, arrow)
+                local arrow = Arrow.new(selected, mine_order_entity)
+                player.hover_arrows[arrow] = arrow
             end
         end
 
@@ -622,9 +535,8 @@ function tas.update_player_hover(player, player_entity)
                 local mine_order_entity = indexes.mine_order:get_entity()
                 local waypoint_entity = indexes.waypoint:get_entity()
                 if is_valid(mine_order_entity) and is_valid(waypoint_entity) then
-                    local arrow = tas.create_arrow(mine_order_entity, waypoint_entity)
-                    tas.insert_arrow_into_auto_update_respository(arrow)
-                    table.insert(player.hover_arrows, arrow)
+                    local arrow = Arrow.new(mine_order_entity, waypoint_entity)
+                    player.hover_arrows[arrow] = arrow
                 end
             end
         end
@@ -657,31 +569,26 @@ function tas.check_players_hovering_entities()
     end
 end
 
-function tas.update_arrow_repository()
-    local arrows_to_remove = { }
+function tas.update_hover_arrows()
 
-    for _, arrow in pairs(global.arrow_auto_update_repository) do
-        if arrow.disposed == true then
-            table.insert(arrows_to_remove, arrow)
-        else
-            local arrow_visible = tas.update_arrow(arrow)
-            if arrow_visible == false then
-                tas.destroy_arrow(arrow)
-                return table.insert(arrows_to_remove, arrow)
+    for _, player in pairs(global.players) do
+        local arrows_to_remove = { }
+
+        for _, arrow in pairs(player.hover_arrows) do
+            local is_valid = arrow:update()
+            if is_valid == false then
+                table.insert(arrows_to_remove, arrow)
             end
+        end
+        
+        for _, arrow in ipairs(arrows_to_remove) do
+            arrow:destroy()
+            player.hover_arrows[arrow] = nil
         end
     end
 
-    for _, arrow in ipairs(arrows_to_remove) do
-        global.arrow_auto_update_repository[arrow] = nil
-    end
 end
 
-function tas.insert_arrow_into_auto_update_respository(arrow_facade)
-    if arrow_facade == nil then error() end
-
-    global.arrow_auto_update_repository[arrow_facade] = arrow_facade
-end
 
 function tas._on_sequence_changed(event)
     
@@ -707,7 +614,7 @@ end
 function tas.on_tick(event)
     tas.check_players_hovering_entities()
 
-    tas.update_arrow_repository()
+    tas.update_hover_arrows()
 
     global.playback_controller:on_tick()
 end

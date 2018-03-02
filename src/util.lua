@@ -408,6 +408,15 @@ function util.entity.get_entity_id(entity)
     return entity.position.x .. '_' .. entity.position.y .. '_' .. entity.surface.name .. '_' .. name
 end
 
+-- Attempts to read the property of the object.
+-- It's first result returns true when the property was read, along
+-- with the value of the property. In the case of an error, it returns false.
+function util.entity.try_read_property(entity, property_name)
+    return pcall(function() 
+        return entity[property_name]
+    end)
+end
+
 function util.find_entity(surface_name, entity_name, position)
     local surface = game.surfaces[surface_name]
     if surface == nil then return nil end

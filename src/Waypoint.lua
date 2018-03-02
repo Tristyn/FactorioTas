@@ -375,7 +375,7 @@ function Waypoint:set_highlight(highlighted)
 end
 
 --[Comment]
--- Returns a direction the character as to walk to move closer to the Waypoint.
+-- Returns a direction the character has to walk to move closer to the Waypoint.
 -- Returns nil if it would move over the Waypoint.
 function Waypoint:get_direction(character)
 	local walking_speed = util.get_walking_speed(character)
