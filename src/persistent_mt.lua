@@ -10,23 +10,25 @@ function persistent_mt.init(module, module_name, module_metatable)
 	assert(persistent_mt.mt_store[module_name] == nil)
 
 	persistent_mt.mt_store[module_name] = module_metatable
-	
+
 	module_metatable.__src = module_name
+	
 end
 
-function persistent_mt.bless(instance, module)
+function persistent_mt.bless(instance, module_metatable)
 	fail_if_missing(instance)
-	fail_if_missing(module)
+	fail_if_missing(module_metatable)
 
-	local src = module.__src
+	local src = module_metatable.__src
 	
 	if src == nil then error("Must call init before bless") end
 
 	local mt = persistent_mt.mt_store[src]
 
 	if mt == nil then error() end
+	if mt ~= module_metatable then error() end
 	
-	setmetatable(instance, mt)
+	setmetatable(instance, module_metatable)
 	instance.__src = src
 end
 

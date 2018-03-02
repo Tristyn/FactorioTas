@@ -23,7 +23,7 @@ function SequenceIndexer.set_metatable(instance)
 	Event.set_metatable(instance.waypoint_changed)
 	Event.set_metatable(instance.mine_order_changed)
 	Event.set_metatable(instance.build_order_changed)
-	Event.set_metatable(instance.item_transfer_changed)
+	Event.set_metatable(instance.item_transfer_order_changed)
 	Event.set_metatable(instance.craft_order_changed)
 	Event.set_metatable(instance.changed)
 	
@@ -37,12 +37,12 @@ function SequenceIndexer.new()
 	local new = {
 		_waypoint_index = { },
 		_order_indexes = {
-			MineOrder = { }
-			BuildOrder = { }
+			MineOrder = { },
+			BuildOrder = { },
 			ItemTransferOrder = { }
 			-- craft orders don't get indexed, they aren't
 			-- tied to any entity other than the character
-		}
+		},
 		sequences = { },
 
 		sequence_changed = Event.new(),
@@ -53,7 +53,7 @@ function SequenceIndexer.new()
 		craft_order_changed = Event.new(),
 		changed = Event.new()
 	}
-	new._order_events_by_type {
+	new._order_events_by_type = {
 		MineOrder = new.mine_order_changed,
 		BuildOrder = new.build_order_changed,
 		ItemTransferOrder = new.item_transfer_order_changed,

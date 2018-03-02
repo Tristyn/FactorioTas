@@ -16,7 +16,7 @@ mt.init(CraftOrder, "CraftOrder", metatable)
 
 function CraftOrder.set_metatable(instance)
     mt.bless(instance, metatable)
-    Event.set_metatable(instance)
+    Event.set_metatable(instance.changed)
 end
 
 function CraftOrder.new(recipe_name, count)
@@ -30,7 +30,7 @@ function CraftOrder.new(recipe_name, count)
     }
 
     CraftOrder.set_metatable(new)
-
+    
     new:set_count(count)
 
     return new
