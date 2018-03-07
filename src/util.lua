@@ -2,6 +2,7 @@ local position = require("position")
 local bounding_box = require("bounding_box")
 local mathex = require("mathex")
 
+-- TODO: this would be better as a local
 constants = {
     -- Some of these constants can be read/written during data initialization phase.
     -- There is no way to know their value during game execution phase so they are stored here.
@@ -25,6 +26,7 @@ constants = {
     }
 }
 
+-- TODO: this would be better as a local
 util = { }
 
 function util.init_globals()
@@ -555,6 +557,9 @@ function util.clone_table(source_table)
     return target_table
 end
 
+-- Similar to JavaScript Object.assign() 
+-- It's used in this codebase as util.assign_table({}, foo)
+-- so that it's in functional style, just like as a shallow clone method.
 function util.assign_table(target_table, source_table)
     for source_key, source_value in pairs(source_table) do
         target_table[source_key] = source_value
@@ -562,3 +567,5 @@ function util.assign_table(target_table, source_table)
 
     return target_table
 end
+
+return util
