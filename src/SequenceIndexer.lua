@@ -19,6 +19,7 @@ function SequenceIndexer.set_metatable(instance)
 
 	setmetatable(instance, metatable)
 
+	Event.set_metatable(instance.sequence_collection_changed)
 	Event.set_metatable(instance.sequence_changed)
 	Event.set_metatable(instance.waypoint_changed)
 	Event.set_metatable(instance.mine_order_changed)
@@ -45,6 +46,7 @@ function SequenceIndexer.new()
 		},
 		sequences = { },
 
+		sequence_collection_changed = Event.new(),
 		sequence_changed = Event.new(),
 		waypoint_changed = Event.new(),
 		mine_order_changed = Event.new(),
@@ -76,7 +78,7 @@ function SequenceIndexer:new_sequence()
 	sequences[insert_index] = sequence
 	sequence:set_index(insert_index)
 
-	self:_changed("add_sequence", sequence)
+	self:_on_sequence_collection_changed("add_sequence", sequence)
 
 	for _, waypoint in pairs(sequence.waypoints) do
 		local event = sequence:get_change_event("add_waypoint", waypoint)
@@ -108,18 +110,34 @@ function SequenceIndexer:remove_sequence(sequence)
 		self:_remove_waypoint(waypoint)
 	end
 
-	self:_changed("remove_sequence", sequence)
+	self:_on_sequence_collection_changed("remove_sequence", sequence)
 	sequence.changed:remove(self, "_on_sequence_changed")
 end
 
 --[Comment]
--- Registers a callback to be run when the SequenceIndexer changes and provides an event object.
--- T")"s is called every time a sequence is added or removed.
+-- Registers a callback to be run when the SequenceIndexer changes and provides an event object. This event legit does nothing yet :)
+-- single parameter `event` with the following fields:
+-- sender :: The SequenceIndexer that triggered the callback.
+-- type :: string: NO EVENT TYPES YET CAUSE IT DOES NOTHING :) //////Can be [foo]
+function SequenceIndexer:_changed(event_type, sequence)
+	fail_if_missing(event_type)
+	fail_if_missing(sequence)
+
+	local event = {
+		sender = self,
+		type = event_type
+	}
+
+	self.changed:invoke(event);
+end
+
+--[Comment]
+-- Registers a callback to be run when the sequence collection and provides an event object.
 -- single parameter `event` with the following fields:
 -- sender :: The SequenceIndexer that triggered the callback.
 -- type :: string: Can be [add_sequence|remove_sequence]
--- sequence :: Sequnce: The sequence.
-function SequenceIndexer:_changed(event_type, sequence)
+-- sequence :: Sequence: The sequence.
+function SequenceIndexer:_on_sequence_collection_changed(event_type, sequence)
 	fail_if_missing(event_type)
 	fail_if_missing(sequence)
 

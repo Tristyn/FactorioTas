@@ -12,6 +12,7 @@ function tas.init_globals()
     global.playback_controller = PlaybackController.new()
     global.players = { }
 
+    global.sequence_indexer.sequence_collection_changed:add(tas, "_on_sequence_collection_changed")
     global.sequence_indexer.sequence_changed:add(tas, "_on_sequence_changed")
 end
 
@@ -24,7 +25,8 @@ function tas.init_player(player_index)
     global.players[player_index] =
     {
         hover_arrows = { },
-        waypoint_build_mode = "insert"
+        waypoint_build_mode = "insert",
+        waypoint = nil -- set through events from tas.select_waypoint
     }
 
     tas.ensure_true_spawn_position_set(game.players[player_index])
@@ -589,6 +591,23 @@ function tas.update_hover_arrows()
 
 end
 
+function tas._on_sequence_collection_changed(event)
+    if event.type == "add_sequence" then
+        tas.select_waypoint(event.sequence.waypoints[1])
+    elseif event.type == "remove_sequence" then
+        for index, player in pairs(global.players) do
+            if player.waypoint.sequence == event.sequence then
+                local waypoint_to_select = nil
+
+                for _, sequence in pair(global.sequence_indexer.sequences) do
+                    waypoint_to_select = sequence.waypoints[1]
+                end
+
+                tas.select_waypoint(index, waypoint_to_select)
+            end
+        end
+    end
+end
 
 function tas._on_sequence_changed(event)
     
