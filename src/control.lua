@@ -37,10 +37,14 @@ function fail_if_invalid(entity, msg)
     return false
 end
 
+function log_error(msg)
+    game.print {"TAS-err-generic", msg }
+end
+
 local tas = require("tas");
 
 require("util")
-local Gui = require("gui")
+local Gui = require("Gui")
 local GuiEvents = require("GuiEvents")
 
 inspect = require("inspect")
@@ -77,7 +81,7 @@ end )
 
 script.on_event(defines.events.on_player_created, function(event)
     local _, err = xpcall(function(event) global.gui:init_player(event.player_index) end, debug.traceback, event)
-    if err then game.print( { "TAS-err-specific", "on_player_created", err }) end
+    if err then log_error { "TAS-err-specific", "on_player_created", err } end
 end )
 
 script.on_event(defines.events.on_gui_click, function(event)
@@ -86,45 +90,45 @@ script.on_event(defines.events.on_gui_click, function(event)
         -- gui:on_click is deprecated, use gui_events in the future
         global.gui:on_click(event)
     end, debug.traceback, event)
-    if err then game.print( { "TAS-err-specific", "on_gui_click", err }) end
+    if err then log_error { "TAS-err-specific", "on_gui_click", err } end
 end )
 
 script.on_event(defines.events.on_gui_checked_state_changed, function(event)
     local _, err = xpcall(function (...) global.gui_events:on_check_changed(event) end, debug.traceback, event)
-    if err then game.print( { "TAS-err-specific", "on_check_changed", err }) end
+    if err then log_error { "TAS-err-specific", "on_check_changed", err } end
 end )
 
 script.on_event(defines.events.on_gui_selection_state_changed, function(event)
     local _, err = xpcall(function (...) global.gui_events:on_dropdown_selection_changed(event) end, debug.traceback, event)
-    if err then game.print( { "TAS-err-specific", "on_dropdown_selection_changed", err }) end
+    if err then log_error { "TAS-err-specific", "on_dropdown_selection_changed", err } end
 end )
 
 script.on_event(defines.events.on_built_entity, function(event)
     local _, err = xpcall(tas.on_built_entity, debug.traceback, event)
-    if err then game.print( { "TAS-err-specific", "on_built_entity", err }) end
+    if err then log_error { "TAS-err-specific", "on_built_entity", err } end
 end )
 
 script.on_event(defines.events.on_pre_player_mined_item, function(event)
     local _, err = xpcall(tas.on_pre_mined_entity, debug.traceback, event)
-    if err then game.print( { "TAS-err-specific", "on_preplayer_mined_item", err }) end
+    if err then log_error { "TAS-err-specific", "on_preplayer_mined_item", err } end
 end )
 
 script.on_event(defines.events.on_robot_pre_mined, function(event)
     local _, err = xpcall(tas.on_pre_mined_entity, debug.traceback, event)
-    if err then game.print( { "TAS-err-specific", "on_robot_pre_mined", err }) end
+    if err then log_error { "TAS-err-specific", "on_robot_pre_mined", err } end
 end )
 
 script.on_event(defines.events.on_player_crafted_item, function(event)
     local _, err = xpcall(tas.on_crafted_item, debug.traceback, event)
-    if err then game.print( { "TAS-err-specific", "on_crafted_item", err }) end
+    if err then log_error { "TAS-err-specific", "on_crafted_item", err } end
 end )
 
 script.on_event("tas-select-hotkey", function(event)
     local _, err = xpcall(tas.on_left_click, debug.traceback, event)
-    if err then game.print( { "TAS-err-specific", "tas-select-hotkey", err }) end
+    if err then log_error { "TAS-err-specific", "tas-select-hotkey", err } end
 end )
 
 script.on_event(defines.events.on_tick, function(event)
     local _, err = xpcall(tas.on_tick, debug.traceback, event)
-    if err then game.print( { "TAS-err-specific", "on_tick", err }) end
+    if err then log_error { "TAS-err-specific", "on_tick", err } end
 end )

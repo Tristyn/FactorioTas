@@ -1,5 +1,7 @@
 -- An event object that supports reentrancy.
 
+local inspect = require("inspect")
+
 local Event = { }
 local metatable = { __index = Event }
 
@@ -26,7 +28,7 @@ function Event:add(callback_object, callback_function_name)
 	end
 
 	if self:_is_call_reentrant() then
-		self:_add_during_reentrancy(callback_object, _callback_function_name)
+		self:_add_during_reentrancy(callback_object, callback_function_name)
 	else
 		self:_add(callback_object, callback_function_name)
 	end
@@ -50,6 +52,7 @@ function Event:_add(callback_object, callback_function_name)
 	obj_num_entries = obj_num_entries + 1
 	obj_callbacks[callback_function_name] = callback_function_name
 	self.callback_objects_num_entries[callback_object] = obj_num_entries
+	self:_verify()
 end
 
 function Event:_add_during_reentrancy(callback_object, callback_function_name)
@@ -59,16 +62,16 @@ function Event:_add_during_reentrancy(callback_object, callback_function_name)
 	-- update self.callback_objects
 	local obj_callbacks = self.callback_objects[callback_object]
 	if obj_callbacks == nil then
-		obj_callbacks = { [callback_function_name] = callback_function_name }
-		self.callback_objects[callback_object] = obj_callbacks -- defer
+		obj_callbacks = { }
+		obj_callbacks[callback_function_name] = callback_function_name
 	elseif obj_callbacks[callback_function_name] ~= nil then
 		error("The callback was added twice.")
 	else
 		obj_callbacks = util.assign_table({}, obj_callbacks)
 		obj_callbacks[callback_function_name] = callback_function_name
 	end
-	self.callback_objects = util.assign_table({}, obj_callbacks)
-	self.callback_objects[obj_callbacks] = obj_callbacks
+	self.callback_objects = util.assign_table({}, self.callback_objects)
+	self.callback_objects[callback_object] = obj_callbacks
 
 	-- update self.callback_objects_num_entries
 	local obj_num_entries = self.callback_objects_num_entries[callback_object]
@@ -76,6 +79,7 @@ function Event:_add_during_reentrancy(callback_object, callback_function_name)
 		obj_num_entries = 0
 	end
 	self.callback_objects_num_entries[callback_object] = obj_num_entries + 1
+	self:_verify()
 end
 
 function Event:invoke(...)
@@ -85,25 +89,35 @@ function Event:invoke(...)
 	local callback_objects = self.callback_objects
 
 	local ok, err = xpcall(
-		function(...) for object, callback_names in pairs(self.callback_objects) do
-			for function_name, _ in pairs(callback_names) do
-				object[function_name](object, ...)
+		function(...) 
+			for object, callback_names in pairs(callback_objects) do
+				--game.print(serpent.block(callback_names))
+				for function_name, _ in pairs(callback_names) do
+					object[function_name](object, ...)
+				end
 			end
-		end
-	end, ..., debug.stacktrace)
+		end, 
+	debug.traceback, ...)
 
 
 	self.reentry_count = self.reentry_count - 1
 	assert(self.reentry_count >= 0)
 
-	if not ok then
-		error(err)
+	if err then
+		log_error (inspect(err))
 	end
+	self:_verify()
 end
 
 function Event:remove(callback_object, callback_function_name)
+	-- ensure the callback exists and is callable
+	if Event._is_func_callable(callback_object, callback_function_name) == false then
+		error("Couldn't find function " .. callback_function_name .. " in callback object.")
+	end
+
+
 	if self:_is_call_reentrant() then
-		self:_remove_during_reentrancy(callback_object, _callback_function_name)
+		self:_remove_during_reentrancy(callback_object, callback_function_name)
 	else
 		self:_remove(callback_object, callback_function_name)
 	end
@@ -114,7 +128,7 @@ function Event:_remove(callback_object, callback_function_name)
 	if obj_callbacks == nil then error() end
 	local callback_exists = obj_callbacks[callback_function_name] ~= nil
 
-	if not callback_exists == true then error()	end
+	if callback_exists == false then error() end
 	obj_callbacks[callback_function_name] = nil
 	
 	self.callback_objects_num_entries[callback_object] = self.callback_objects_num_entries[callback_object] - 1
@@ -123,29 +137,34 @@ function Event:_remove(callback_object, callback_function_name)
 		self.callback_objects[callback_object] = nil
 		self.callback_objects_num_entries[callback_object] = nil
 	end
+	self:_verify()
 end
 
 function Event:_remove_during_reentrancy(callback_object, callback_function_name)
 
+	local obj_callbacks
 	self.callback_objects_num_entries[callback_object] = self.callback_objects_num_entries[callback_object] - 1
 	local num_entries = self.callback_objects_num_entries[callback_object]
 	if num_entries == 0 then
 		self.callback_objects_num_entries[callback_object] = nil
 
-		local callback_objects = util.assign_table({}, self.callback_objects)
-		callback_objects[callback_object] = nil
-		self.callback_objects = callback_objects
+		obj_callbacks = { }
+	elseif num_entries == nil then
+		error()
 	else
-		local obj_callbacks = self.callback_objects[callback_object]
+		obj_callbacks = self.callback_objects[callback_object]
 
 		if obj_callbacks == nil then error() end
 		if obj_callbacks[callback_function_name] == nil then error() end
 		
 		obj_callbacks = util.assign_table({}, obj_callbacks)
 		obj_callbacks[callback_function_name] = nil
-		self.callback_objects = callback_objects
 	end
 
+	local callback_objects = util.assign_table({}, self.callback_objects)
+	callback_objects[callback_object] = obj_callbacks
+	self.callback_objects = callback_objects
+	self:_verify()
 end
 
 function Event:_is_call_reentrant()
@@ -153,6 +172,9 @@ function Event:_is_call_reentrant()
 end
 
 function Event._is_func_callable(callback_object, callback_function_name)
+	fail_if_missing(callback_object)
+	fail_if_missing(callback_function_name)
+
 	local func = callback_object[callback_function_name]
 	
 	if type(func) == "function" then
@@ -165,6 +187,18 @@ function Event._is_func_callable(callback_object, callback_function_name)
 	end
 
 	return type(mt.__call) == "function"
+end
+
+function Event:_verify()
+	local callback_objects = self.callback_objects
+	for object, callbacks in pairs(callback_objects) do
+		assert(object ~= nil)
+		assert(type(callbacks) == "table")
+		for key, val in pairs(callbacks) do
+			assert(type(key) == "string")
+			assert(type(val) == "string")
+		end
+	end
 end
 
 return Event

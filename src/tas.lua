@@ -61,6 +61,8 @@ function tas.ensure_true_spawn_position_set(freshly_spawned_player)
     -- The best solution I found is to store the exact position of a player when they spawn for the first time.
     -- Note the stored position becomes innacurate if the player landfills over a watery spawn.
 
+    fail_if_invalid(freshly_spawned_player)
+
     if global.true_spawn_position == nil then
         global.true_spawn_position = freshly_spawned_player.position
     end
@@ -591,7 +593,7 @@ function tas.update_hover_arrows()
 
 end
 
-function tas._on_sequence_collection_changed(event)
+function tas._on_sequence_collection_changed(self, event)
     if event.type == "add_sequence" then
         tas.select_waypoint(event.sequence.waypoints[1])
     elseif event.type == "remove_sequence" then
@@ -609,12 +611,11 @@ function tas._on_sequence_collection_changed(event)
     end
 end
 
-function tas._on_sequence_changed(event)
+function tas._on_sequence_changed(self, event)
     
     if event.type == "add_waypoint" then
         for index, player in pairs(global.players) do
             if player.waypoint == nil then
-                game.print("Highlight")
                 tas.select_waypoint(index, event.waypoint)
             end
         end
