@@ -213,13 +213,13 @@ function Gui:show_entity_editor(player_index, entity, character)
 
         entity_editor.mine_checkbox = entity_editor.root.add { type = "checkbox", caption = "mine", state = mine_order_exists, name = util.get_guid() }
         
-        local callback = Delegate.new(self, "mine_checkbox_changed_callback")
+        local callback = Delegate.new(self, "_mine_checkbox_changed_callback")
         self.gui_events:register_check_changed_callback(entity_editor.mine_checkbox, callback)
     end
 
 end
 
-function Gui:mine_checkbox_changed_callback(event)
+function Gui:_mine_checkbox_changed_callback(event)
     local player_index = event.player_index
     local entity_editor = self.players[player_index].entity_editor
     local mine_checkbox = entity_editor.mine_checkbox

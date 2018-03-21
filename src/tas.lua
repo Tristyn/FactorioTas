@@ -123,21 +123,33 @@ function tas.find_waypoint_from_entity(waypoint_entity)
 end
 
 function tas.find_build_order_from_entity(ghost_entity)
-    for sequence_index, sequence in ipairs(global.sequence_indexer.sequences) do
-        for waypoint_index, waypoint in ipairs(sequence.waypoints) do
-            local build_order_index = tas.scan_table_for_value(waypoint.build_orders, function(build_order) return build_order:get_entity() end, ghost_entity)
-            if build_order_index ~= nil then
-                return {
-                    sequence = sequence,
-                    sequence_index = sequence_index,
-                    waypoint = waypoint,
-                    waypoint_index = waypoint_index,
-                    build_order = waypoint.build_orders[build_order_index],
-                    build_order_index = build_order_index
-                }
-            end
-        end
+    fail_if_invalid(ghost_entity)
+
+    local orders = global.sequence_indexer:find_orders_from_entity(ghost_entity, BuildOrder)
+    
+    if #orders > 1 then
+        log_error("Entity look up found mulitple related build orders. Picking the newest one.")
     end
+
+    local first_order = nil
+
+    for _, order in pairs(orders) do
+        first_order = order
+        break
+    end
+
+    if first_order == nil then
+        return nil
+    end
+
+    return {
+        sequence = first_order.waypoint.sequence,
+        sequence_index = first_order.waypoint.sequence.index,
+        waypoint = first_order.waypoint,
+        waypoint_index = first_order.waypoint.index,
+        build_order = first_order,
+        build_order_index = first_order.index
+    }
 end
 
 function tas.find_mine_order_from_entity_and_waypoint(entity, waypoint)

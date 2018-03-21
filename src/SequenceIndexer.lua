@@ -38,9 +38,9 @@ function SequenceIndexer.new()
 	local new = {
 		_waypoint_index = { },
 		_order_indexes = {
-			MineOrder = { },
-			BuildOrder = { },
-			ItemTransferOrder = { }
+			[MineOrder] = { },
+			[BuildOrder] = { },
+			[ItemTransferOrder] = { }
 			-- craft orders don't get indexed, they aren't
 			-- tied to any entity other than the character
 		},
