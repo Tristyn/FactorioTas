@@ -166,10 +166,14 @@ end
 function Waypoint:_spawn_entity()
 
 	if util.find_entity(self.surface_name, "tas-waypoint", self.position) ~= nil then 
-		error("Waypoint object was created too close to another.")
+		self:_throw_waypoint_exists()
 	end
 
 	Waypoint.spawn_entity(game.surfaces[self.surface_name], self.position)
+end
+
+function Waypoint:_throw_waypoint_exists()
+	error("Waypoint object was created too close to another.")
 end
 
 function Waypoint._configure_entity(entity)
@@ -314,10 +318,23 @@ function Waypoint:_remove_order(order_collection, order_type, index)
 end
 
 function Waypoint:move(surface_name, position)
+	fail_if_missing(surface_name)
+	fail_if_missing(position)
+
+	if self.surface_name == surface_name and self.position.x == position.x and self.position.y == position.y then
+		return;
+	end
+
 	self:_move(surface_name, position)
 end
 
 function Waypoint:move_to_entity(waypoint_entity)
+	fail_if_invalid(waypoint_entity)
+
+	if self.surface_name == waypoint_entity.surface.name and self.position.x == position then
+		return;
+	end
+
 	self:_move(waypoint_entity.surface.name, waypoint_entity.position, waypoint_entity)
 end
 

@@ -52,7 +52,7 @@ function Event:_add(callback_object, callback_function_name)
 	obj_num_entries = obj_num_entries + 1
 	obj_callbacks[callback_function_name] = callback_function_name
 	self.callback_objects_num_entries[callback_object] = obj_num_entries
-	self:_verify()
+	--self:_verify()
 end
 
 function Event:_add_during_reentrancy(callback_object, callback_function_name)
@@ -79,7 +79,7 @@ function Event:_add_during_reentrancy(callback_object, callback_function_name)
 		obj_num_entries = 0
 	end
 	self.callback_objects_num_entries[callback_object] = obj_num_entries + 1
-	self:_verify()
+	--self:_verify()
 end
 
 function Event:invoke(...)
@@ -106,7 +106,7 @@ function Event:invoke(...)
 	if err then
 		log_error (inspect(err))
 	end
-	self:_verify()
+	--self:_verify()
 end
 
 function Event:remove(callback_object, callback_function_name)
@@ -137,7 +137,7 @@ function Event:_remove(callback_object, callback_function_name)
 		self.callback_objects[callback_object] = nil
 		self.callback_objects_num_entries[callback_object] = nil
 	end
-	self:_verify()
+	--self:_verify()
 end
 
 function Event:_remove_during_reentrancy(callback_object, callback_function_name)
@@ -164,7 +164,7 @@ function Event:_remove_during_reentrancy(callback_object, callback_function_name
 	local callback_objects = util.assign_table({}, self.callback_objects)
 	callback_objects[callback_object] = obj_callbacks
 	self.callback_objects = callback_objects
-	self:_verify()
+	--self:_verify()
 end
 
 function Event:_is_call_reentrant()
@@ -189,16 +189,17 @@ function Event._is_func_callable(callback_object, callback_function_name)
 	return type(mt.__call) == "function"
 end
 
-function Event:_verify()
-	local callback_objects = self.callback_objects
-	for object, callbacks in pairs(callback_objects) do
-		assert(object ~= nil)
-		assert(type(callbacks) == "table")
-		for key, val in pairs(callbacks) do
-			assert(type(key) == "string")
-			assert(type(val) == "string")
-		end
-	end
-end
+-- verify integrity of some of the table data
+-- function Event:_verify()
+-- 	local callback_objects = self.callback_objects
+-- 	for object, callbacks in pairs(callback_objects) do
+-- 		assert(object ~= nil)
+-- 		assert(type(callbacks) == "table")
+-- 		for key, val in pairs(callbacks) do
+-- 			assert(type(key) == "string")
+-- 			assert(type(val) == "string")
+-- 		end
+-- 	end
+-- end
 
 return Event
