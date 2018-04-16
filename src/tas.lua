@@ -85,7 +85,7 @@ function tas.ensure_cheat_mode_enabled(player)
     end
 
     if player_entity.cheat_mode == false then
-        player_entity.print("[TAS] Editor: Enabling cheat mode.")
+        player_entity.print{"TAS-info-specific", "Editor", "Enabling cheat mode.")
         player_entity.cheat_mode = true
     end
 end

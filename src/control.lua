@@ -39,7 +39,9 @@ end
 
 function log_error(msg)
     game.print(msg)
-    game.write_file("tas-log_error.txt", msg, true)
+    game.write_file("tas-log_error.txt", serpent.block(msg), true)
+    -- game.write_file can't do localizable strings like game.print
+    -- we gotta dispatch our best monkeys to work on it
 end
 
 local tas = require("tas");
