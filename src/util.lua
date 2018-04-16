@@ -36,7 +36,7 @@ end
 function util.get_guid()
     global.guid_count = global.guid_count + 1
     if global.guid_count < 0 then
-        log{ "TAS-err-generic", "Globally unique ID overflow. Replace GUID with a big int implementation!" }
+        log_error{ "TAS-err-generic", "Globally unique ID overflow. Replace GUID with a big int implementation!" }
     end
     return global.guid_count
 end

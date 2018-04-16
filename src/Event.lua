@@ -103,7 +103,7 @@ function Event:invoke(...)
 	assert(self.reentry_count >= 0)
 
 	if err then
-		log (inspect(err))
+		log_error (inspect(err))
 	end
 	--self:_verify()
 end

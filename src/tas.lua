@@ -100,7 +100,7 @@ function tas.ensure_first_sequence_initialized()
         return
     end
 
-    log{"TAS-info-specific", "Editor", "Placing the initial waypoint at spawn."}
+    log_error{"TAS-info-specific", "Editor", "Placing the initial waypoint at spawn."}
     local sequence = tas.new_sequence()
 end
 
@@ -128,7 +128,7 @@ function tas.find_build_order_from_entity(ghost_entity)
     local orders = global.sequence_indexer:find_orders_from_entity(ghost_entity, BuildOrder)
     
     if #orders > 1 then
-        log("Entity look up found mulitple related build orders. Picking the newest one.")
+        log_error("Entity look up found mulitple related build orders. Picking the newest one.")
     end
 
     local first_order = nil
@@ -326,12 +326,12 @@ function tas.remove_waypoint(waypoint_entity)
     local waypoint = global.sequence_indexer:find_waypoint_from_entity(waypoint_entity)
 
     if waypoint == nil then
-        log{ "TAS-err-specific", "Editor", "Could not locate data for waypoint entity. This should never happen. Stacktrace: " .. debug.traceback() }
+        log_error{ "TAS-err-specific", "Editor", "Could not locate data for waypoint entity. This should never happen. Stacktrace: " .. debug.traceback() }
         return false
     end
 
     if waypoint.sequence:can_remove_waypoint(waypoint.index) == false then
-        log{ "TAS-info-specific", "Editor", "Can't remove the only waypoint in the sequence." }
+        log_error{ "TAS-info-specific", "Editor", "Can't remove the only waypoint in the sequence." }
         return false
     end
 
@@ -439,7 +439,7 @@ function tas.on_clicked_ghost(player_index, ghost_entity)
     if tas.is_waypoint_selected(player_index) == false then
         local build_order_indexes = tas.find_build_order_from_entity(ghost_entity)
         if build_order_indexes == nil then 
-            log{"TAS-err-specific", "Editor", "no build order for this ghost"} 
+            log_error{"TAS-err-specific", "Editor", "no build order for this ghost"} 
             return 
         end
         tas.select_waypoint(player_index, build_order_indexes.waypoint)

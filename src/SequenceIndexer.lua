@@ -206,7 +206,7 @@ function SequenceIndexer:_add_order(order, order_type)
 		end
 
 		if orders_for_id:add(order) == false then
-			log { "TAS-err-generic", "order added to SequenceIndexer twice, this shouldn't happen." }
+			log_error { "TAS-err-generic", "order added to SequenceIndexer twice, this shouldn't happen." }
 		end
 	end
 
@@ -229,7 +229,7 @@ function SequenceIndexer:_remove_order(order, order_type)
 		end
 
 		if orders_for_id:remove(order) == false then
-			log{ "TAS-err-generic", "order removed to SequenceIndexer that wasn't added, this shouldn't happen."}
+			log_error{ "TAS-err-generic", "order removed to SequenceIndexer that wasn't added, this shouldn't happen."}
 		end
 
 		if #orders_for_id == 0 then

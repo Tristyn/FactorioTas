@@ -193,7 +193,7 @@ function BuildOrder:move_order_item_to_cursor_stack(player)
     if util.move_item_stack(player.cursor_stack, item_to_place, character, inventory_ids) == true then
         return true
     else
-        log( { "TAS-err-specific", "Runner", "Could not move items from the players hand into inventory because there wasn't room. Make room in your inventory. Using cheats to delete the extra items." })
+        log_error( { "TAS-err-specific", "Runner", "Could not move items from the players hand into inventory because there wasn't room. Make room in your inventory. Using cheats to delete the extra items." })
         player.cursor_stack.clear()
         util.move_item_stack(player.cursor_stack, item_to_place, character, inventory_ids)
         return true
