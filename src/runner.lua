@@ -137,7 +137,7 @@ function Runner:_step_mine_state()
         for _, mine_order in pairs(self.pending_mine_orders) do
             -- ensure tool durability remains
             if character ~= nil and mine_order:has_sufficient_tool_durability(character) == false then 
-                game.print("Error: TAS does not know how to calculate time spent mining when a mining tool is about to break. Ensure that the character never runs out of mining tools. Cheating and breaking the last tool before mining.")
+                log{"TAS-err-specific", "Runner", "TAS does not yet know how to calculate time spent mining when a mining tool is about to break. Ensure that the character never runs out of mining tools. Cheating and breaking the last tool before mining." }
                 character.get_inventory(defines.inventory.player_tools)[1].clear()
             end
 
@@ -179,7 +179,7 @@ function Runner:_step_mine_state()
             
             -- ensure tool durability remains
             if mine_order:has_sufficient_tool_durability(character) == false then 
-                game.print("Error: TAS does not know how to calculate time spent mining when a mining tool is about to break. Ensure that the character never runs out of mining tools. Cheating and breaking the last tool before mining.")
+                log{"TAS-err-specific", "Runner", "TAS does not yet know how to calculate time spent mining when a mining tool is about to break. Ensure that the character never runs out of mining tools or clear the slot before it's final use. Cheating and breaking the last tool before mining." }
                 character.get_inventory(defines.inventory.player_tools)[1].clear()
             end
         end

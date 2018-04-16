@@ -30,7 +30,7 @@ script.on_event(defines.events.on_tick, function()
 	end
 	
 	if selected_name ~= last_selected_name or gui_type_name ~= last_gui_type_name then
-		game.print("{ Tick: " .. game.tick .. ", Selected: " .. selected_name .. ", Gui type: " .. gui_type_name .. ", Opened self: " .. tostring(game.players[1].opened_self) .. " }" )
+		log("{ Tick: " .. game.tick .. ", Selected: " .. selected_name .. ", Gui type: " .. gui_type_name .. ", Opened self: " .. tostring(game.players[1].opened_self) .. " }" )
 	end
 	
 	last_selected_name = selected_name

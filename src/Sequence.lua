@@ -30,7 +30,7 @@ function Sequence.new()
     local new_waypoint = sequence:insert_waypoint(1, "nauvis", origin)
     if new_waypoint == nil then
         
-        game.print("Could not create a waypoint at spawn because one already exists there.")
+        log{"TAS-err-generic", "Could not create a waypoint at spawn because one already exists there."}
         
     else
             

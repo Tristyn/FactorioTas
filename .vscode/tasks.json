@@ -4,7 +4,7 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Deploy mod to dir ./lib/factorio_0.15/mods",
+            "label": "Deploy mod to dir ./lib/factorio_.../mods",
             "type": "shell",
             "group": {
                 "kind": "build",

@@ -100,7 +100,7 @@ function tas.ensure_first_sequence_initialized()
         return
     end
 
-    game.print("[TAS] Editor: Placing the initial waypoint at spawn.")
+    log{"TAS-info-specific", "Editor", "Placing the initial waypoint at spawn."}
     local sequence = tas.new_sequence()
 end
 
@@ -128,7 +128,7 @@ function tas.find_build_order_from_entity(ghost_entity)
     local orders = global.sequence_indexer:find_orders_from_entity(ghost_entity, BuildOrder)
     
     if #orders > 1 then
-        log_error("Entity look up found mulitple related build orders. Picking the newest one.")
+        log("Entity look up found mulitple related build orders. Picking the newest one.")
     end
 
     local first_order = nil
@@ -326,12 +326,12 @@ function tas.remove_waypoint(waypoint_entity)
     local waypoint = global.sequence_indexer:find_waypoint_from_entity(waypoint_entity)
 
     if waypoint == nil then
-        game.print( { "TAS-err-generic", "Could not locate data for waypoint entity. This should never happen. Stacktrace: " .. debug.traceback() })
+        log{ "TAS-err-specific", "Editor", "Could not locate data for waypoint entity. This should never happen. Stacktrace: " .. debug.traceback() }
         return false
     end
 
     if waypoint.sequence:can_remove_waypoint(waypoint.index) == false then
-        game.print( { "TAS-err-generic", "Can't remove the only waypoint in the sequence." } )
+        log{ "TAS-info-specific", "Editor", "Can't remove the only waypoint in the sequence." }
         return false
     end
 
@@ -439,7 +439,7 @@ function tas.on_clicked_ghost(player_index, ghost_entity)
     if tas.is_waypoint_selected(player_index) == false then
         local build_order_indexes = tas.find_build_order_from_entity(ghost_entity)
         if build_order_indexes == nil then 
-            game.print("no build order for this ghost") 
+            log{"TAS-err-specific", "Editor", "no build order for this ghost"} 
             return 
         end
         tas.select_waypoint(player_index, build_order_indexes.waypoint)
@@ -481,6 +481,10 @@ end
 
 function tas.update_player_hover(player, player_entity)
 
+    -- delete arrow collection
+    for _, arrow in pairs(player.hover_arrows) do
+        arrow:destroy()
+    end
     player.hover_arrows = { }
 
     -- can be null
@@ -491,12 +495,7 @@ function tas.update_player_hover(player, player_entity)
     if selected == nil then
         return
     end
-
-    -- delete arrow collection
-    for _, arrow in ipairs(player.hover_arrows) do
-        arrow:destroy()
-    end
-    player.hover_arrows = { }
+    
 
     -- check if it's a build order
     local find_result = tas.find_build_order_from_entity(selected)
@@ -504,10 +503,9 @@ function tas.update_player_hover(player, player_entity)
         local build_order_entity = find_result.build_order:get_entity()
         local waypoint_entity = find_result.waypoint:get_entity()
         if is_valid(build_order_entity) and is_valid(waypoint_entity) then
-            local arrow = Arrow.new(build_order_entity, waypoint_entity)
+            local arrow = Arrow.new(waypoint_entity, build_order_entity)
             player.hover_arrows[arrow] = arrow
         end
-        return
     elseif selected.name == "tas-waypoint" then
 
         local waypoint = global.sequence_indexer:find_waypoint_from_entity(selected)
@@ -520,7 +518,7 @@ function tas.update_player_hover(player, player_entity)
         if prev ~= nil then
             local prev_waypoint_entity = prev:get_entity() 
             if is_valid(prev_waypoint_entity) then
-                local arrow = Arrow.new(prev_waypoint_entity, selected)
+                local arrow = Arrow.new(selected, prev_waypoint_entity)
                 player.hover_arrows[arrow] = arrow
             end
         end
@@ -551,7 +549,7 @@ function tas.update_player_hover(player, player_entity)
                 local mine_order_entity = indexes.mine_order:get_entity()
                 local waypoint_entity = indexes.waypoint:get_entity()
                 if is_valid(mine_order_entity) and is_valid(waypoint_entity) then
-                    local arrow = Arrow.new(mine_order_entity, waypoint_entity)
+                    local arrow = Arrow.new(waypoint_entity, mine_order_entity)
                     player.hover_arrows[arrow] = arrow
                 end
             end

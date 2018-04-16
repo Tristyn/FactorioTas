@@ -87,7 +87,7 @@ function PlaybackController:remove_runner(runner)
             -- murder it
             if is_valid(instance.character) then
                 if instance.character.destroy() == false then
-                    game.print( { "TAS-err-generic", "couldn't destroy character :( pls fix" })
+                    log( { "TAS-err-generic", "couldn't destroy character :( pls fix" })
                 end
             end
 

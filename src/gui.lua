@@ -468,7 +468,7 @@ function Gui:build_inventory_grid_control(container_frame, inventory, sprite_pat
     
     
     if on_item_stack_clicked_callback ~= nil then
-        game.print("Update inventory grid callback pls")
+        log("Update inventory grid callback pls")
     end
 
     for i = 1, #inventory do

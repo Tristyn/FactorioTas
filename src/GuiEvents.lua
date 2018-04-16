@@ -83,7 +83,7 @@ function GuiEvents:register_check_changed_callback(checkbox_element, callback)
     fail_if_invalid(checkbox_element)
     fail_if_missing(callback)
     if type(callback) ~= table then 
-        log_error("Argument `callback` must be type `Delegate`.")
+        log{"TAS-err-specific", "GUI", "Argument `callback` must be type `Delegate`."}
     end
 
     local callbacks = self._check_changed_callbacks

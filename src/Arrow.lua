@@ -43,13 +43,13 @@ function Arrow.new(source_entity, target_entity)
         } )
     end
 
-    -- new.beam = source_entity.surface.create_entity({
-	-- 	name = "tas-arrow",
-	-- 	-- position doesn't matter
-    --     position = DUMMY_POSITION,
-    --     source = new.source_proxy or source_entity,
-	-- 	target = new.target_proxy or target_entity
-	-- })
+    new.beam = source_entity.surface.create_entity({
+		name = "tas-arrow",
+		-- position doesn't matter
+        position = DUMMY_POSITION,
+        source = new.source_proxy or source_entity,
+		target = new.target_proxy or target_entity
+	})
 
 	Arrow.set_metatable(new)
 
@@ -83,7 +83,7 @@ function Arrow:update()
 end
 
 --[Comment]
--- Can the beam still be draw?
+-- Can the beam still be drawn?
 -- If not then might as well let the caller call destroy()
 function Arrow:is_valid()
 	return self.source.valid
@@ -94,19 +94,19 @@ end
 -- [Comment]
 -- Destroys any internal entities and renders the object useless.
 -- Subsequent calls to other instance methods will result in an error.
-function Arrow.destroy()
+function Arrow:destroy()
     self.destroyed = true
-
-    if self.source_proxy ~= nil and self.source_proxy.valid == true then
+    
+    if is_valid(self.source_proxy) then
 		self.source_proxy.destroy()
     end
 
-    if self.target_proxy ~= nil and self.target_proxy.valid == true then
+    if is_valid(self.target_proxy) then
         self.target_proxy.destroy()
     end
 
     -- beam might be nil if destroy is called twice
-    if self.beam ~= nil and self.beam.valid == true then
+    if is_valid(self.beam) then
         self.beam.destroy()
     end
 end
