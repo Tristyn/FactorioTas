@@ -38,10 +38,17 @@ function fail_if_invalid(entity, msg)
 end
 
 function log_error(msg)
-    game.print(msg)
-    game.write_file("tas-log_error.txt", serpent.block(msg), true)
+    game.print(msg) -- chat
+    game.write_file("tas-log_error.txt", serpent.block(msg), true) -- log file
     -- game.write_file can't do localizable strings like game.print
     -- we gotta dispatch our best monkeys to work on it
+    log(msg) -- stdout
+
+
+    -- log("foo") will produce: 118.767 Script log("foo"):1: foo
+    -- log({"foo"}) will produce: 118.767 Script log("foo"):1: `foo` but as a localized string
+    -- print("foo") writes raw strings to stdout with newline
+    -- print({"foo"}) will write the table pointer to stdout with newline
 end
 
 local tas = require("tas");
