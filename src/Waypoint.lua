@@ -14,7 +14,7 @@ local Template = require("Template")
 -- -- moved
 -- -- -- old_surface_name :: string
 -- -- -- old_position :: table: {x , y}
--- -- order_removed|order_added
+-- -- [order_removed|order_added]
 -- -- -- order_type: reference to [MineOrder|BuildOrder|..]
 -- -- -- order :: the order of type order_type
 
@@ -304,7 +304,7 @@ function Waypoint:_remove_order(order_collection, order_type, index)
 	end
 	
 	local order = table.remove(order_collection, index)
-
+	
 	for i = index, #order_collection do
 		order_collection[i]:set_index(i)
 	end
