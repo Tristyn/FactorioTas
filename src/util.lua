@@ -477,7 +477,7 @@ function util.get_mining_time_and_durability_loss(miner_entity, minable_entity_n
     return time_in_ticks, durability_loss
 end
 
-function util.get_item_stack_split_count(click_event, item_name)
+function util.get_item_stack_split_count_from_click_event(click_event, item_name)
     fail_if_missing(click_event)
     fail_if_missing(item_name)
 

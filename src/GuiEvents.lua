@@ -48,7 +48,7 @@ end
 ---player_index :: uint: The player who did the clicking.
 function GuiEvents:register_click_callback(element, callback)
     fail_if_invalid(element)
-    fail_if_missing(callback)
+    self:_ensure_delegate(callback)
 
     local callbacks = self._click_event_callbacks
 
@@ -82,9 +82,8 @@ end
 function GuiEvents:register_check_changed_callback(checkbox_element, callback)
     fail_if_invalid(checkbox_element)
     fail_if_missing(callback)
-    if type(callback) ~= table then 
-        log_error{"TAS-err-specific", "GUI", "Argument `callback` must be type `Delegate`."}
-    end
+
+    self:_ensure_delegate(callback)
 
     local callbacks = self._check_changed_callbacks
 
@@ -118,6 +117,8 @@ function GuiEvents:register_dropdown_selection_changed_callback(dropdown_element
     fail_if_invalid(dropdown_element)
     fail_if_missing(callback)
 
+    self:_ensure_delegate(callback)
+    
     local callbacks = self._dropdown_selection_state_changed_callbacks
 
     if dropdown_element.name == "" or callbacks[dropdown_element.name] ~= nil then
@@ -145,6 +146,12 @@ function GuiEvents:on_dropdown_selection_changed(event)
     local callback = self._dropdown_selection_state_changed_callbacks[element.name]
     if callback ~= nil then
         callback:invoke(event)
+    end
+end
+
+function GuiEvents:_ensure_delegate(callback)
+    if type(callback) ~= "table" then 
+        error{"TAS-err-specific", "GUI", "Argument `callback` must be type `Delegate`.\n" .. debug.traceback()}
     end
 end
 

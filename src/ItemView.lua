@@ -56,12 +56,12 @@ function ItemView:_initialize_elements(container, sprite_path_prefix)
 	local btn = container.add( { type = "sprite-button", sprite = sprite_path_prefix .. item_stack.name--[[, style = "button-style"--]], name = util.get_guid() })
 	self._item_btn = btn
 	self._root = btn
-	gui_events.register_click_event(btn, Delegate.new(self, "_click_handler"))
+	gui_events:register_click_callback(btn, Delegate.new(self, "_click_handler"))
 
 	if item_stack.count > 0 then
 		local count = btn.add( { type = "label", caption = tostring(item_stack.count), name = util.get_guid() })
 		self._item_label = count
-		gui_events.register_click_event(count, Delegate.new(self, "_click_handler"))
+		gui_events:register_click_callback(count, Delegate.new(self, "_click_handler"))
 	end
 end
 
@@ -76,23 +76,23 @@ end
 function ItemView:_click_handler(event)
 	local wrapper_event = {
 		sender = self,
-		type = "clicked"
+		type = "clicked",
 		item_gui_element = self._item_btn,
 		item_stack = self._item_stack,
 		click_event = event
 	}
-
+	
 	self.changed:invoke(wrapper_event)
 end
 
 function ItemView:dispose()
 	if self._item_btn ~= nil then
-		self._gui_events.unregister_click_callbacks(self._item_btn)
+		self._gui_events:unregister_click_callbacks(self._item_btn)
 		self._item_btn = nil
 	end
 
 	if self._item_label ~= nil then
-		self._gui_events.unregister_click_callbacks(self._item_label)
+		self._gui_events:unregister_click_callbacks(self._item_label)
 		self._item_label = nil
 	end
 end

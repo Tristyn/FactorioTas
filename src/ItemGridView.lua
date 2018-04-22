@@ -41,18 +41,19 @@ function ItemGridView.new(container, gui_events, inventory, sprite_path_prefix)
 
 	local new = {
 		_root = nil,
-		changed = Event.new(),
-		_item_view_to_inventory_index = { }
+		_inventory = inventory,
+		_item_view_to_inventory_index = { },
+		changed = Event.new()
 	}
 
 	ItemGridView.set_metatable(new)
-	new:_initialize_elements(container, gui_events)
+	new:_initialize_elements(container, gui_events, sprite_path_prefix)
 
 	return new
 end
 
-function ItemGridView:_initialize_elements(container, gui_events)
-	local inventory = self.inventory
+function ItemGridView:_initialize_elements(container, gui_events, sprite_path_prefix)
+	local inventory = self._inventory
 
 	local root = container.add { type = "table", column_count = GRID_COLUMN_COUNT }
 	self._root = root
@@ -61,8 +62,8 @@ function ItemGridView:_initialize_elements(container, gui_events)
         local item_stack = inventory[i]
         if item_stack.valid_for_read == nil or item_stack.valid_for_read == true then
 
-            local item_view = ItemView.new(root, item_stack, sprite_path_prefix)
-			_item_view_to_inventory_index[item_view] = i
+            local item_view = ItemView.new(root, gui_events, item_stack, sprite_path_prefix)
+			self._item_view_to_inventory_index[item_view] = i
 			item_view.changed:add(self, "_item_changed_handler")
 
         end
@@ -83,7 +84,7 @@ function ItemGridView:_item_changed_handler(event)
 	local wrapper_event = {
 		sender = self,
 		type = "item_clicked",
-		inventory = self.inventory,
+		inventory = self._inventory,
 		item_stack_index = self._item_view_to_inventory_index[event.sender],
 		item_click_event = event
 	}

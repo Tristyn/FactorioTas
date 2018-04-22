@@ -1,6 +1,7 @@
 local Delegate = require("Delegate")
 local GuiEvents = require("GuiEvents")
 local MineOrderView = require("MineOrderView")
+local ItemGridView = require("ItemGridView")
 local tas = require("tas")
 
 local Gui = { }
@@ -114,10 +115,18 @@ end
 function Gui:hide_entity_editor(player_index)
     fail_if_missing(player_index)
 
-    local gui = self.players[player_index]
+    local entity_editor = self.players[player_index].entity_editor
 
-    if gui.entity_editor.root ~= nil then
-        gui.entity_editor.container.clear()
+    if entity_editor.entity_inventory.item_grid ~= nil then
+        entity_editor.entity_inventory.item_grid:dispose()
+    end
+    
+    if entity_editor.character_inventory.item_grid ~= nil then
+        entity_editor.character_inventory.item_grid:dispose()
+    end
+
+    if entity_editor.root ~= nil then
+        entity_editor.container.clear()
     end
 end
 
@@ -179,7 +188,8 @@ function Gui:show_entity_editor(player_index, entity, character)
         elseif entity_inventory == nil or entity_inventory.is_empty() == true then
             entity_editor.root.add { type = "label", caption = "empty" }
         else
-            Gui:build_inventory_grid_control(entity_editor.root, entity_inventory, "item/", tas.gui.entity_info_transfer_inventory_clicked_callback)
+            entity_editor.entity_inventory.item_grid = ItemGridView.new(entity_editor.root, self.gui_events, entity_inventory, "item/")
+            entity_editor.entity_inventory.item_grid.changed:add(self, "entity_info_transfer_inventory_clicked_callback")
         end
         
         -- Character Inventory
@@ -195,7 +205,8 @@ function Gui:show_entity_editor(player_index, entity, character)
         if character_inventory.is_empty() == true then
             entity_editor.root.add { type = "label", caption = "empty" }
         else
-            self:build_inventory_grid_control(entity_editor.root, character_inventory, "item/", tas.gui.entity_info_transfer_inventory_clicked_callback)
+            entity_editor.character_inventory.item_grid = ItemGridView.new(entity_editor.root, self.gui_events, character_inventory, "item/")
+            entity_editor.character_inventory.item_grid.changed:add(self, "entity_info_transfer_inventory_clicked_callback")
         end
     end
     
@@ -260,11 +271,14 @@ function Gui:handle_inventory_transfer_dropdown_changed(event)
 end
 
 function Gui:entity_info_transfer_inventory_clicked_callback(event)
+    if event.type ~= "item_clicked" then return end
+
     -- event = { gui_element, player_index, inventory, item_stack, item_stack_index }
-    local click_event = event.click_event
+    local item_click_event = event.item_click_event
+    local click_event = item_click_event.click_event
     local player_index = click_event.player_index
     local inventory = event.inventory
-    local item_stack = event.item_stack
+    local item_stack = item_click_event.item_stack
     local item_stack_index = event.item_stack_index
     local entity_editor = self.players[player_index].entity_editor
     local character = entity_editor.character
@@ -276,10 +290,10 @@ function Gui:entity_info_transfer_inventory_clicked_callback(event)
 
     local is_player_receiving = util.get_inventory_owner(inventory) == entity
 
-    local item_stack_count = util.get_item_stack_split_count(click_event, item_stack.name)
+    local item_stack_count = util.get_item_stack_split_count_from_click_event(click_event, item_stack.name)
 
     local items = { name = item_stack.name, count = item_stack_count }
-    tas.add_item_transfer_order(player_index, is_player_receiving, character_inventory_index, entity,entity_inventory_index, items)
+    tas.add_item_transfer_order(player_index, is_player_receiving, character_inventory_index, entity, entity_inventory_index, items)
     self:refresh(player_index)
 end
 
@@ -307,13 +321,16 @@ function Gui:hide_waypoint_editor(player_index)
 end
 
 function Gui:crafting_queue_item_clicked_callback(event)
-    local click_event = event.click_event
+    if event.type ~= "item_clicked" then return end
+
+    local item_click_event = event.item_click_event
+    local click_event = item_click_event.click_event
     local gui = self.players[click_event.player_index]
     local waypoint = global.sequence_indexer.sequences[gui.sequence_index].waypoints[gui.waypoint_index]
     local craft_order = waypoint.craft_orders[event.item_stack_index]
     
 
-    local items_to_remove = util.get_item_stack_split_count(event, craft_order.recipe_name)
+    local items_to_remove = util.get_item_stack_split_count_from_click_event(click_event, craft_order.recipe_name)
 
     if craft_order:get_count() > items_to_remove then
         craft_order:set_count(craft_order:get_count() - items_to_remove)
@@ -352,7 +369,8 @@ function Gui:show_waypoint_editor(player_index, sequence_index, waypoint_index)
     if #waypoint.craft_orders > 0 then
         gui.waypoint.add { type = "label", caption = "crafting queue" }
         local craft_orders_as_inventory = self:craft_orders_to_inventory(waypoint.craft_orders)
-        self:build_inventory_grid_control(gui.waypoint, craft_orders_as_inventory, "recipe/", self.crafting_queue_item_clicked_callback)
+        gui.waypoint_editor.crafting_queue = ItemGridView.new(gui.waypoint, self.gui_events, craft_orders_as_inventory, "recipe/")
+        gui.waypoint_editor.crafting_queue.changed:add(self, "crafting_queue_item_clicked_callback")
     end
 
     -- item transfer orders
@@ -420,12 +438,12 @@ function Gui:try_handle_waypoint_editor_item_transfer_clicked(event)
             util.alert(row.order.container_surface_name, row.order.container_position)
             return true
         elseif button == row.increment_button then
-            local num_to_add = util.get_item_stack_split_count(event, row.order.item_stack.name)
+            local num_to_add = util.get_item_stack_split_count_from_click_event(event, row.order.item_stack.name)
             row.order:set_count(row.order:get_count() + num_to_add)
             self:refresh(event.player_index)
             return true
         elseif button == row.decrement_button then
-            local num_to_remove = util.get_item_stack_split_count(event, row.order.item_stack.name)
+            local num_to_remove = util.get_item_stack_split_count_from_click_event(event, row.order.item_stack.name)
             local new_count = math.max(row.order:get_count() - num_to_remove, 1)
             row.order:set_count(new_count)
             self:refresh(event.player_index)

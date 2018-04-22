@@ -11,7 +11,7 @@
 local Delegate = { }
 
 function Delegate:invoke(...)
-	self.callback_object[self.callback_function_name](...)
+	self.callback_object[self.callback_function_name](self.callback_object, ...)
 end
 
 local metatable = { __index = Delegate, __call = Delegate.invoke }
