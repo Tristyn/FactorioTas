@@ -4,6 +4,7 @@ local Sequence = require("Sequence")
 local SequenceIndexer = require("SequenceIndexer")
 local PlaybackController = require("PlaybackController")
 local Arrow = require("Arrow")
+local Constants = require("Constants")
 
 local tas = { }
 
