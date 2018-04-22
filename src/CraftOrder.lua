@@ -33,6 +33,10 @@ function CraftOrder.new(recipe_name, count)
     
     new:set_count(count)
 
+    if new:get_recipe() == nil then
+        error({"TAS-recipe-not-found", recipe_name})
+    end
+
     return new
 end
 
@@ -68,6 +72,10 @@ end
 
 function CraftOrder:get_count()
     return self._count
+end
+
+function CraftOrder:get_recipe()
+    return game.recipe_prototypes[self.recipe_name]
 end
 
 function CraftOrder:set_count(value)

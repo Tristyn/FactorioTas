@@ -71,11 +71,11 @@ function util.get_walking_speed(character)
     end
     --]]
 
-    return running_speed_modifier * constants.base_walking_speed
+    return running_speed_modifier * Constants.base_walking_speed
 end
 
 function util.get_build_distance(character)
-    return constants.base_build_distance + character.character_build_distance_bonus
+    return Constants.base_build_distance + character.character_build_distance_bonus
 end
 
 -- south/down = +y
@@ -295,9 +295,9 @@ function util.get_player_inventories(player)
     fail_if_invalid(player)
 
     if player.controller_type == defines.controllers.character then
-        return constants.character_inventories
+        return Constants.character_inventories
     elseif player.controller_type == defines.controllers.god then
-        return constants.god_inventories
+        return Constants.god_inventories
     else
         return { }
     end
@@ -453,20 +453,61 @@ function util.get_mining_time_and_durability_loss(miner_entity, minable_entity_n
     return time_in_ticks, durability_loss
 end
 
-function util.get_item_stack_split_count_from_click_event(click_event, item_name)
-    fail_if_missing(click_event)
-    fail_if_missing(item_name)
+-- returns the count of the stack, or the max stack size if it is a prototype name
+function util.get_item_count(item_stack_or_name)
+    local item_type = type(item_stack_or_name)
+    
+    if item_type == "nil" then
+        error()
+    elseif item_type == "string" then
+        return game.item_prototypes[item_stack_or_name].stack_size
+    else
+        -- item stack could be SimpleItemStack (table) or LuaItemStack (userdata)
+        return item_stack_or_name.count
+    end
+end
 
-    if click_event.button == defines.mouse_button_type.left  then
+-- Emulates the build-in inventory.
+-- a `stack split` is the portion (or all of) a item stack that moves
+-- to the players hand when they click it in the inventory. 
+-- will return 0 when the click event would not result in a
+-- stack split within the built-in inventory.
+function util.get_item_stack_split_count_from_click_event(click_event, item_stack_or_name)
+    fail_if_missing(click_event)
+    fail_if_missing(item_stack_or_name)
+    local item_type = type(item_stack_or_name)
+    local stack_size = util.get_item_count(item_stack_or_name)
+
+    if click_event.button == defines.mouse_button_type.left and click_event.shift == false and click_event.control == false then
+        return stack_size
+        -- note if "shift" is pressed then the game will actually quick-transfer the
+        -- item into another inventory depending on which gui is currently open.
+    elseif click_event.button == defines.mouse_button_type.right then
+        -- return half the count rounded up
+        return stack_size / 2 + stack_size % 2
+    else 
+        return 0
+    end
+end
+
+-- Emulates the build-in inventory.
+-- will return 0 when the click event would not initiate crafting within the built-in inventory
+function util.get_crafting_count_from_click_event(click_event, recipe_prototype_or_name)
+    fail_if_missing(click_event)
+    fail_if_missing(recipe_prototype_or_name)
+    local item_type = type(item_stack_or_name)
+    local stack_size = util.get_item_count(item_stack_or_name)
+
+    if click_event.button == defines.mouse_button_type.left and click_event.control == false then
         if click_event.shift == true then
-            return game.item_prototypes[item_name].stack_size
+            return stack_size
         else
             return 1
         end
-    elseif click_event.button == defines.mouse_button_type.right then
+    elseif click_event.button == defines.mouse_button_type.right and click_event.shift == false and click_event.control == false then
         return 5
     else 
-        return 1
+        return 0
     end
 end
 

@@ -279,7 +279,6 @@ function Gui:entity_info_transfer_inventory_clicked_callback(event)
     local player_index = click_event.player_index
     local inventory = event.inventory
     local item_stack = item_click_event.item_stack
-    local item_stack_index = event.item_stack_index
     local entity_editor = self.players[player_index].entity_editor
     local character = entity_editor.character
     local entity = entity_editor.entity
@@ -290,10 +289,9 @@ function Gui:entity_info_transfer_inventory_clicked_callback(event)
 
     local is_player_receiving = util.get_inventory_owner(inventory) == entity
 
-    local item_stack_count = util.get_item_stack_split_count_from_click_event(click_event, item_stack.name)
+    local item_stack_count = util.get_item_stack_split_count_from_click_event(click_event, item_stack)
 
-    local items = { name = item_stack.name, count = item_stack_count }
-    tas.add_item_transfer_order(player_index, is_player_receiving, character_inventory_index, entity, entity_inventory_index, items)
+    tas.add_item_transfer_order(player_index, is_player_receiving, character_inventory_index, entity, entity_inventory_index, item_stack)
     self:refresh(player_index)
 end
 
@@ -324,13 +322,17 @@ function Gui:crafting_queue_item_clicked_callback(event)
     if event.type ~= "item_clicked" then return end
 
     local item_click_event = event.item_click_event
+    local item_stack = item_click_event.item_stack
     local click_event = item_click_event.click_event
     local gui = self.players[click_event.player_index]
     local waypoint = global.sequence_indexer.sequences[gui.sequence_index].waypoints[gui.waypoint_index]
     local craft_order = waypoint.craft_orders[event.item_stack_index]
     
 
-    local items_to_remove = util.get_item_stack_split_count_from_click_event(click_event, craft_order.recipe_name)
+    -- use the recipe name
+    local recipe = craft_order.get_recipe()
+    local product_stack
+    local items_to_remove = util.get_crafting_count_from_click_event(click_event, craft_order.get_recipe())
 
     if craft_order:get_count() > items_to_remove then
         craft_order:set_count(craft_order:get_count() - items_to_remove)
@@ -438,12 +440,12 @@ function Gui:try_handle_waypoint_editor_item_transfer_clicked(event)
             util.alert(row.order.container_surface_name, row.order.container_position)
             return true
         elseif button == row.increment_button then
-            local num_to_add = util.get_item_stack_split_count_from_click_event(event, row.order.item_stack.name)
+            local num_to_add = util.get_item_stack_split_count_from_click_event(event, row.order.item_stack)
             row.order:set_count(row.order:get_count() + num_to_add)
             self:refresh(event.player_index)
             return true
         elseif button == row.decrement_button then
-            local num_to_remove = util.get_item_stack_split_count_from_click_event(event, row.order.item_stack.name)
+            local num_to_remove = util.get_item_stack_split_count_from_click_event(event, row.order.item_stack)
             local new_count = math.max(row.order:get_count() - num_to_remove, 1)
             row.order:set_count(new_count)
             self:refresh(event.player_index)

@@ -422,7 +422,7 @@ function tas.on_crafted_item(event)
 
     local player = global.players[player_index]
     
-    util.remove_item_stack(player_entity.character, item_stack, constants.character_inventories, player_entity)
+    util.remove_item_stack(player_entity.character, item_stack, Constants.character_inventories, player_entity)
     player.waypoint:add_craft_order(recipe.name, item_stack.count / recipe.products[1].amount)
     global.gui:refresh(player_index)
 
