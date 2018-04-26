@@ -8,9 +8,8 @@ local Event = require("Event")
 -- type :: string: Can be any of [clicked]
 -- Additional type specific parameters:
 -- -- clicked
--- -- -- item_gui_element :: LuaGuiElement button: the root element of the item in the grid,
--- -- -- may not be same element as click_event.element which was physically clicked.
--- -- -- item_stack :: SimpleItemStack: may instead be a duck-typed LuaItemStack
+-- -- -- item_gui_element :: LuaGuiElement: the sprite-button that was clicked.
+-- -- -- item_stack :: SimpleItemStack: may instead be a duck-typed LuaItemStack.
 -- -- -- click_event :: table: The raw Factorio event, see:
 -- -- -- -> http://lua-api.factorio.com/latest/events.html#on_gui_click
 
@@ -40,7 +39,6 @@ function ItemView.new(container, gui_events, item_stack, sprite_path_prefix)
 		changed = Event.new(),
 		_item_stack = item_stack,
 		_item_btn = nil, -- also the view root
-		_item_label = nil
 	}
 
 	ItemView.set_metatable(new)
@@ -53,16 +51,10 @@ function ItemView:_initialize_elements(container, sprite_path_prefix)
 	local item_stack = self._item_stack
 	local gui_events = self._gui_events
 
-	local btn = container.add( { type = "sprite-button", sprite = sprite_path_prefix .. item_stack.name--[[, style = "button-style"--]], name = util.get_guid() })
+	local btn = container.add( { type = "sprite-button", sprite = sprite_path_prefix .. item_stack.name--[[, style = "button-style"--]], number = item_stack.count, name = util.get_guid() })
 	self._item_btn = btn
 	self._root = btn
 	gui_events:register_click_callback(btn, Delegate.new(self, "_click_handler"))
-
-	if item_stack.count > 0 then
-		local count = btn.add( { type = "label", caption = tostring(item_stack.count), name = util.get_guid() })
-		self._item_label = count
-		gui_events:register_click_callback(count, Delegate.new(self, "_click_handler"))
-	end
 end
 
 function ItemView:show()
@@ -89,11 +81,6 @@ function ItemView:dispose()
 	if self._item_btn ~= nil then
 		self._gui_events:unregister_click_callbacks(self._item_btn)
 		self._item_btn = nil
-	end
-
-	if self._item_label ~= nil then
-		self._gui_events:unregister_click_callbacks(self._item_label)
-		self._item_label = nil
 	end
 end
 

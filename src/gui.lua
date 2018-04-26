@@ -2,6 +2,7 @@ local Delegate = require("Delegate")
 local GuiEvents = require("GuiEvents")
 local MineOrderView = require("MineOrderView")
 local ItemGridView = require("ItemGridView")
+local ItemView = require("ItemView")
 local tas = require("tas")
 
 local Gui = { }
@@ -19,6 +20,10 @@ function Gui.set_metatable(instance)
         for _, mine_order_view in ipairs(player_gui.waypoint_editor.mine_orders) do
             MineOrderView.set_metatable(mine_order_view)
         end
+
+        ItemGridView.set_metatable(player_gui.waypoint_editor.crafting_queue)
+        ItemGridView.set_metatable(player_gui.entity_editor.character_inventory.item_grid)
+        ItemGridView.set_metatable(player_gui.entity_editor.entity_inventory.item_grid)
     end
 
 end
@@ -119,13 +124,15 @@ function Gui:hide_entity_editor(player_index)
 
     if entity_editor.entity_inventory.item_grid ~= nil then
         entity_editor.entity_inventory.item_grid:dispose()
+        entity_editor.entity_inventory.item_grid = nil
     end
     
     if entity_editor.character_inventory.item_grid ~= nil then
         entity_editor.character_inventory.item_grid:dispose()
+        entity_editor.character_inventory.item_grid = nil
     end
 
-    if entity_editor.root ~= nil then
+    if entity_editor.container ~= nil then
         entity_editor.container.clear()
     end
 end
@@ -300,9 +307,9 @@ function Gui:hide_waypoint_editor(player_index)
 
 
     local gui = self.players[player_index]
+    local waypoint = gui.waypoint_editor.waypoint
 
-    if gui.sequence_index ~= nil and gui.waypoint_index ~= nil then 
-        local waypoint = global.sequence_indexer.sequences[gui.sequence_index].waypoints[gui.waypoint_index]
+    if waypoint ~= nil then 
         waypoint.changed:remove(self, "handle_waypoint_editor_waypoint_changed")
     end
 
@@ -312,52 +319,44 @@ function Gui:hide_waypoint_editor(player_index)
             mine_order_view:dispose()
         end
 
+        gui.waypoint_editor.previous_waypoint.changed:remove(self, "waypoint_editor_next_previous_clicked_callback")
+        gui.waypoint_editor.next_waypoint.changed:remove(self, "waypoint_editor_next_previous_clicked_callback")
+        gui.waypoint_editor.previous_waypoint:dispose()
+        gui.waypoint_editor.next_waypoint:dispose()
+
         gui.waypoint_container.clear()
         gui.waypoint_editor.mine_order_views = { }
         gui.waypoint = nil
     end
 end
 
-function Gui:crafting_queue_item_clicked_callback(event)
-    if event.type ~= "item_clicked" then return end
-
-    local item_click_event = event.item_click_event
-    local item_stack = item_click_event.item_stack
-    local click_event = item_click_event.click_event
-    local gui = self.players[click_event.player_index]
-    local waypoint = global.sequence_indexer.sequences[gui.sequence_index].waypoints[gui.waypoint_index]
-    local craft_order = waypoint.craft_orders[event.item_stack_index]
-    
-
-    -- use the recipe name
-    local recipe = craft_order.get_recipe()
-    local product_stack
-    local items_to_remove = util.get_crafting_count_from_click_event(click_event, craft_order.get_recipe())
-
-    if craft_order:get_count() > items_to_remove then
-        craft_order:set_count(craft_order:get_count() - items_to_remove)
-    else
-        waypoint:remove_craft_order(event.item_stack_index)
-    end
-    
-    self:refresh(click_event.player_index)
-end
-
-function Gui:show_waypoint_editor(player_index, sequence_index, waypoint_index)
+function Gui:show_waypoint_editor(player_index, waypoint)
     fail_if_missing(player_index)
-    fail_if_missing(sequence_index)
-    fail_if_missing(waypoint_index)
+    fail_if_missing(waypoint)
 
     self:hide_waypoint_editor(player_index)
 
-    local waypoint = global.sequence_indexer.sequences[sequence_index].waypoints[waypoint_index]
     local gui = self.players[player_index]
-    gui.sequence_index = sequence_index
-    gui.waypoint_index = waypoint_index
-    local container_frame = gui.waypoint_container.add { type = "frame", direction = "vertical", caption = "Waypoint # " .. waypoint_index }
-    gui.waypoint = container_frame.add { type = "table", column_count = 1}
 
     waypoint.changed:add(self, "handle_waypoint_editor_waypoint_changed")
+
+    gui.waypoint_editor.waypoint = waypoint
+    local container_frame = gui.waypoint_container.add { type = "frame", direction = "vertical", caption = "Waypoint # " .. waypoint.index }
+    
+    gui.waypoint = container_frame.add { type = "table", column_count = 1}
+
+    -- next/previous toggles
+    local waypoint_btns = gui.waypoint.add { type = "flow", direction = "horizontal" }    
+    gui.waypoint_editor.previous_waypoint = ItemView.new(waypoint_btns, self.gui_events, { name = "tas-arrow-left" }, "")
+    gui.waypoint_editor.previous_waypoint.changed:add(self, "waypoint_editor_next_previous_clicked_callback")
+    gui.waypoint_editor.next_waypoint = ItemView.new(waypoint_btns, self.gui_events, { name = "tas-arrow-right" }, "")
+    gui.waypoint_editor.next_waypoint.changed:add(self, "waypoint_editor_next_previous_clicked_callback")
+    gui.waypoint_editor.teleport = ItemView.new(waypoint_btns, self.gui_events, { name = "tas-teleport" }, "")
+    gui.waypoint_editor.teleport.changed:add(self, "waypoint_editor_teleport_to_clicked_callback")
+    gui.waypoint_editor.destroy = ItemView.new(waypoint_btns, self.gui_events, { name = "tas-cancel" }, "")
+    gui.waypoint_editor.destroy.changed:add(self, "waypoint_editor_destroy_clicked_callback")
+    
+
 
     -- delay
 
@@ -397,6 +396,7 @@ function Gui:show_waypoint_editor(player_index, sequence_index, waypoint_index)
             end
 
             item_transfer_row.reveal_entity_button = self:build_inventory_item_control(item_transfer_table, { name = order.container_name, count = 0 } , "entity/")
+            item_transfer_row.reveal_entity_button = ItemView
             item_transfer_table.add { type = "sprite", sprite = transfer_direction_sprite}
             item_transfer_row.increment_button = self:build_inventory_item_control(item_transfer_table, order.item_stack, "item/")
             item_transfer_row.decrement_button = item_transfer_table.add { type = "sprite-button", sprite = "tas-decrement"--[[, style = "button-style"--]]}
@@ -408,11 +408,86 @@ function Gui:show_waypoint_editor(player_index, sequence_index, waypoint_index)
     end
 end
 
+function Gui:waypoint_editor_next_previous_clicked_callback(event)
+    local player_index = event.click_event.player_index
+    local gui = self.players[player_index]
+    local waypoint = gui.waypoint_editor.waypoint
+
+    local new_selected_waypoint = nil
+    if event.sender == gui.waypoint_editor.previous_waypoint then
+        new_selected_waypoint = waypoint:try_get_previous_waypoint()
+    elseif event.sender == gui.waypoint_editor.next_waypoint then
+        new_selected_waypoint = waypoint:try_get_next_waypoint()
+    else
+        log_error({"TAS-warning-specific", "GUI", "Could not identify the waypoint iterator buttons."})
+    end
+
+    if new_selected_waypoint == nil then return end
+
+
+    tas.select_waypoint(player_index, new_selected_waypoint)
+
+end
+
+function Gui:waypoint_editor_teleport_to_clicked_callback(event)
+    local player_index = event.click_event.player_index
+    local gui = self.players[player_index]
+    local waypoint = gui.waypoint_editor.waypoint
+    local player_entity = game.players[player_index]
+
+    local control = tas.find_freeroam_control(player_index)
+
+    -- this won't teleport a player in freeroam godmode
+    if is_valid(control.character) == false then
+        log_error({"TAS-err-specific", "Editor", "Can't teleport god-mode players at the moment."})
+        return
+    end
+
+    if control.character ~= player_entity.character and waypoint.surface_name ~= player_entity.surface.name then
+        log_error({"TAS-err-specific", "Editor", "Factorio 0.16.37 Engine Limitation: Surface teleport can only be done for players at the moment."})
+        return
+    end
+    
+    -- ideally we'd pass the control.character if it weren't for engine limitations
+    if waypoint:try_teleport_here(player_entity) == false then
+        log_error({"TAS-err-specific", "Editor", "Player teleport action failed."})
+    end
+end
+
+function Gui:waypoint_editor_destroy_clicked_callback(event)
+    local player_index = event.click_event.player_index
+    local gui = self.players[player_index]
+    local waypoint = gui.waypoint_editor.waypoint
+
+    tas.remove_waypoint(waypoint)
+
+end
+
+function Gui:crafting_queue_item_clicked_callback(event)
+    if event.type ~= "item_clicked" then return end
+
+    local item_click_event = event.item_click_event
+    local item_stack = item_click_event.item_stack
+    local click_event = item_click_event.click_event
+    local gui = self.players[click_event.player_index]
+    local waypoint = gui.waypoint_editor.waypoint
+    local craft_order = waypoint.craft_orders[event.item_stack_index]
+    
+
+    local items_to_remove = util.get_crafting_count_from_click_event(click_event, craft_order.get_recipe())
+
+    if craft_order:get_count() > items_to_remove then
+        craft_order:set_count(craft_order:get_count() - items_to_remove)
+    else
+        waypoint:remove_craft_order(event.item_stack_index)
+    end
+    
+    self:refresh(click_event.player_index)
+end
+
 function Gui:handle_waypoint_editor_waypoint_changed(event)
     local type = event.type
     local waypoint = event.sender
-    local waypoint_index = waypoint.index
-    local sequence_index = waypoint.sequence.index
 
     if type == "moved" or type == "order_removed" then
 
@@ -422,8 +497,10 @@ function Gui:handle_waypoint_editor_waypoint_changed(event)
         -- (as in make the WaypointEditor a view that subscribes to changes)
         for player_index, _ in pairs(game.connected_players) do
             local gui = self.players[player_index]
-            if gui.sequence_index == sequence_index and gui.waypoint_index == waypoint_index then
-                self:show_waypoint_editor(player_index, gui.sequence_index, gui.waypoint_index)
+            local gui_waypoint = gui.waypoint_editor.waypoint
+            if gui_waypoint == waypoint then
+                -- refresh
+                self:show_waypoint_editor(player_index, waypoint)
             end
         end
 
@@ -475,48 +552,7 @@ function Gui:craft_orders_to_inventory(craft_orders)
     return inventory
 end
 
--- inventory is a collection of SimpleItemStack
--- on_item_stack_clicked_callback accepts a table with the fields { gui_element, player_index, inventory, item_stack, item_stack_index }
--- returns the root flow container elemnt for the inventory
-function Gui:build_inventory_grid_control(container_frame, inventory, sprite_path_prefix, on_item_stack_clicked_callback)
-    if on_item_stack_clicked_callback ~= nil and type(on_item_stack_clicked_callback) ~= "function" then error("Invalid callback type") end
-
-
-    local inventory_container = container_frame.add { type = "table", column_count = 10 }
-
-    -- item_stack is SimpleItemStack or LuaItemStack. See http://lua-api.factorio.com/latest/Concepts.html#SimpleItemStack
-    
-    
-    if on_item_stack_clicked_callback ~= nil then
-        log_error("Update inventory grid callback pls")
-    end
-
-    for i = 1, #inventory do
-        local item_stack = inventory[i]
-        if item_stack.valid_for_read == nil or item_stack.valid_for_read == true then
-
-            local btn = self:build_inventory_item_control(inventory_container, item_stack, sprite_path_prefix)
-
-            -- if on_item_stack_clicked_callback ~= nil then
-            --     self:register_click_callback(btn, Delegate.new({
-            --         gui_element = btn,
-            --         inventory = inventory,
-            --         item_stack = item_stack,
-            --         item_stack_index = i,
-            --         inner_callback = on_item_stack_clicked_callback
-            --     }, _G, function(closure, env, click_event)
-            --         local event = util.clone_table(closure)
-            --         event.click_event = click_event
-            --         closure.inner_callback(event)
-            --     end ))
-            -- end
-
-        end
-    end
-
-    return inventory_container
-end
-
+-- [ Deprecated, use ItemView class for new stuff ]
 function Gui:build_inventory_item_control(container, item_stack, sprite_path_prefix)
     local btn = container.add( { type = "sprite-button", sprite = sprite_path_prefix .. item_stack.name--[[, style = "button-style"--]], name = util.get_guid() })
     if item_stack.count > 0 then
@@ -541,9 +577,10 @@ function Gui:refresh(player_index)
     fail_if_missing(player_index)
 
     local gui = self.players[player_index]
+    local waypoint = gui.waypoint_editor.waypoint
 
-    if gui.sequence_index ~= nil and gui.waypoint_index ~= nil then
-        self:show_waypoint_editor(player_index, gui.sequence_index, gui.waypoint_index)
+    if waypoint ~= nil then
+        self:show_waypoint_editor(player_index, waypoint)
     end
 
     local entity_editor = gui.entity_editor

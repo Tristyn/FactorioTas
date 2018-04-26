@@ -5,6 +5,8 @@ local SequenceIndexer = require("SequenceIndexer")
 local PlaybackController = require("PlaybackController")
 local Arrow = require("Arrow")
 local Constants = require("Constants")
+local Collections = require("collections")
+local PlayerControl = require("PlayerControl")
 
 local tas = { }
 
@@ -88,12 +90,14 @@ function tas.ensure_cheat_mode_enabled(player)
     if player_entity.cheat_mode == false then
         player_entity.print{ "TAS-info-specific", "Editor", "Enabling cheat mode." }
         player_entity.cheat_mode = true
+        game.surfaces["nauvis"].always_day = true
     end
 end
 
 -- creates a new sequence and returns it's index in the sequence table
 function tas.new_sequence()
-    return global.sequence_indexer:new_sequence()
+    local sequence = global.sequence_indexer:new_sequence()
+    global.playback_controller:new_runner(sequence, defines.controllers.character)
 end
 
 function tas.ensure_first_sequence_initialized()
@@ -183,6 +187,21 @@ function tas.find_mine_orders_from_entity(entity)
     return found
 end
 
+function tas.find_freeroam_control(player_index)
+    fail_if_missing(player_index)
+    -- if the freeroam character isn't being tracked by the playback
+    -- controller than it must either be attached to the player or the player
+    -- is in god mode.
+
+    local control = global.playback_controller:try_get_pause_control(player_index)
+    
+    if control == nil then
+        control = PlayerControl.from_player(game.players[player_index])
+    end
+
+    return control
+end
+
 function tas.is_waypoint_selected(player_index)
     return global.players[player_index].waypoint ~= nil
 end
@@ -207,7 +226,7 @@ function tas.select_waypoint(player_index, waypoint)
         -- Create the 'highlight' entity
         waypoint:set_highlight(true)
 
-        global.gui:show_waypoint_editor(player_index, waypoint.sequence.index, waypoint.index)
+        global.gui:show_waypoint_editor(player_index, waypoint)
     end
 end
 
@@ -267,7 +286,7 @@ function tas.on_built_ghost(created_ghost, player_index)
 
     local player = global.players[player_index]
 
-    if global.playback_controller:get_current_playback_player() == player then
+    if global.playback_controller:is_player_controlled(player_index) then
         return
     end
 
@@ -309,9 +328,8 @@ function tas.add_mine_order(player_index, entity)
 end
 
 function tas.on_pre_mined_resource(player_index, resource_entity)
-    local player = game.players[player_index]
 
-    if global.playback_controller:get_current_playback_player() == game.players[player_index] then
+    if global.playback_controller:is_player_controlled(player_index) then
         return
     end
 
@@ -323,8 +341,7 @@ function tas.on_pre_mined_resource(player_index, resource_entity)
     global.gui:refresh(player_index)
 end
 
-function tas.remove_waypoint(waypoint_entity)
-    local waypoint = global.sequence_indexer:find_waypoint_from_entity(waypoint_entity)
+function tas.remove_waypoint(waypoint)
 
     if waypoint == nil then
         log_error{ "TAS-err-specific", "Editor", "Could not locate data for waypoint entity. This should never happen. Stacktrace: " .. debug.traceback() }
@@ -340,10 +357,12 @@ function tas.remove_waypoint(waypoint_entity)
 end
 
 function tas.on_pre_removing_waypoint(waypoint_entity)
-    if tas.remove_waypoint(waypoint_entity) == false then
+    local waypoint = global.sequence_indexer:find_waypoint_from_entity(waypoint_entity)
+
+    if tas.remove_waypoint(waypoint) == false then
         -- Removing failed but the factorio engine will still destroy the waypoint entity.
         -- Create a second waypoint at the exact same position to effectively counteract this.
-        Waypoint.spawn_entity(game.surfaces[waypoint_entity.surface.name], waypoint_entity.position)
+        Waypoint.spawn_entity(game.surfaces[waypoint.surface_name], waypoint.position)
     end
 end
 
@@ -355,7 +374,6 @@ function tas.on_pre_removing_ghost(ghost_entity)
 end
 
 function tas.on_pre_mined_entity(event)
-    local player = game.players[event.player_index]
     local robot = event.robot
     local entity = event.entity
 
@@ -365,7 +383,7 @@ function tas.on_pre_mined_entity(event)
         -- Note: factorio doesn't fire this event if a player builds on top of a ghost
         tas.on_pre_removing_ghost(entity)
     elseif entity.type == "resource" then
-        if global.playback_controller:get_current_playback_player() ~= player then
+        if global.playback_controller:is_player_controlled(player_index) then
             tas.on_pre_mined_resource(event.player_index, entity)
         end
     end
@@ -392,7 +410,7 @@ function tas.on_crafted_item(event)
     local player_index = event.player_index
     local player_entity = game.players[player_index]
 
-    if global.playback_controller:get_current_playback_player() == player_entity then
+    if global.playback_controller:is_player_controlled(player_index) then
         return
     end
 

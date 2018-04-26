@@ -1,4 +1,4 @@
-collections = { }
+local collections = { }
 
 function collections.select(source, selector)
     return coroutine.wrap( function()

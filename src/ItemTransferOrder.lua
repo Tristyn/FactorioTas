@@ -71,7 +71,7 @@ function ItemTransferOrder:set_index(index)
 end
 
 function ItemTransferOrder:get_entity_id()
-    return self.container_position.x .. "_" .. self.container_position.y .. "_" .. self.container_surface.name .. "_" .. self.container_name
+    return self.container_position.x .. "_" .. self.container_position.y .. "_" .. self.container_surface_name .. "_" .. self.container_name
 end
 
 function ItemTransferOrder.entity_to_string(item_transfer_container)

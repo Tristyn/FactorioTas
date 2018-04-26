@@ -403,6 +403,31 @@ function Waypoint:has_character_arrived(character)
 	return self:get_direction(character) == nil
 end
 
+-- may return nil
+function Waypoint:try_get_next_waypoint()
+	local sequence = self.sequence
+	if sequence == nil then return nil end
+
+	-- array out of bounds returns nil instead of error, exploit this
+	return sequence.waypoints[self.index + 1]
+end
+
+-- may return nil
+function Waypoint:try_get_previous_waypoint()
+	local sequence = self.sequence
+	if sequence == nil then return nil end
+
+	-- array out of bounds returns nil instead of error, exploit this
+	return sequence.waypoints[self.index - 1]
+end
+
+-- see http://lua-api.factorio.com/latest/LuaControl.html#LuaControl.teleport
+function Waypoint:try_teleport_here(entity)
+	fail_if_invalid(entity)
+
+	return entity.teleport(self.position, self.surface_name)
+end
+
 function Waypoint:destroy()
 	self:_destroy_entity()
 	self:set_highlight(false)

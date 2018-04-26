@@ -1,5 +1,5 @@
 
-shopt -s extglob
+#shopt -s extglob
 #enable !() syntax 
 
 

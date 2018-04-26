@@ -1,5 +1,6 @@
 local PlaybackConfiguration = require("PlaybackConfiguration")
 local Runner = require("Runner")
+local PlayerControl = require("PlayerControl")
 
 local PlaybackController = { }
 local metatable = { __index = PlaybackController }
@@ -55,7 +56,7 @@ end
 -- Returns nil if sequence is empty
 function PlaybackController:new_runner(sequence, controller_type)
     fail_if_missing(sequence)
-    if controller_type == defines.controllers.ghost then
+    if controller_type ~= defines.controllers.character and controller_type ~= defines.controllers.god then
         error()
     end
 
@@ -331,8 +332,52 @@ function PlaybackController:is_playing()
     self.playback_state == PlaybackController.playback_state.tick_3_running
 end
 
-function PlaybackController:get_current_playback_player()
-    return self.configuration.player
+function PlaybackController:is_player_controlled(player_index)
+    fail_if_missing(player_index)
+
+    if self.configuration == nil then
+        return false
+    end
+
+    local player = self.configuration.player
+    if is_valid(player) == false or player.index ~= player_index then
+        return false
+    end
+
+    return true
+end
+
+
+function PlaybackController:try_get_pause_control(player_index)
+    fail_if_missing(player_index)
+
+    if self.configuration == nil then
+        return nil
+    end
+
+    local player = self.configuration.player
+
+    if is_valid(player) == false then
+        return nil
+    end
+    
+    if player.index ~= player_index then
+        return nil
+    end
+
+    local character = self.configuration.player_character_after_playback_completes
+    local control = nil
+
+    if character == nil then
+        control = defines.controllers.god
+    elseif is_valid(character) == false then
+        control = defines.controllers.ghost
+        -- What if playback begins when the player is already a ghost?
+    else
+        control = defines.controllers.character
+    end
+
+    return control
 end
 
 return PlaybackController

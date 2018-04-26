@@ -69,7 +69,7 @@ function BuildOrder:set_index(index)
 end
 
 function BuildOrder:get_entity_id()
-    return self.position.x .. "_" .. self.position.y .. "_" .. self.surface.name .. "_" .. self.name
+    return self.position.x .. "_" .. self.position.y .. "_" .. self.surface_name .. "_" .. self.name
 end
 
 function BuildOrder.id_from_entity(build_order_entity)

@@ -37,5 +37,12 @@ data:extend(
         filename = "__FactorioTas__/graphics/gui/cancel.png",
         width = 32,
         height = 32
+    },
+    {
+        type = "sprite",
+        name = "tas-teleport",
+        filename = "__FactorioTas__/graphics/gui/teleport.png",
+        width = 32,
+        height = 32
     }
 } )

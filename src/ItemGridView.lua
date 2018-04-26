@@ -14,9 +14,8 @@ local ItemView = require("ItemView")
 -- -- -- item_click_event :: table: the event from ItemView.changed:
 -- -- -- -- sender: the ItemView that triggered the callback.
 -- -- -- -- type :: string: = "clicked"
--- -- -- -- item_gui_element :: LuaGuiElement button: the root element of the item in the grid,
--- -- -- -- may not be same element as click_event.element which was physically clicked.
--- -- -- -- item_stack :: SimpleItemStack: may instead be a duck-typed LuaItemStack
+-- -- -- -- item_gui_element :: LuaGuiElement: the sprite-button in the grid that was clicked.
+-- -- -- -- item_stack :: SimpleItemStack: may instead be a duck-typed LuaItemStack.
 -- -- -- -- click_event :: table: The raw Factorio event, see:
 -- -- -- -- -> http://lua-api.factorio.com/latest/events.html#on_gui_click
 
