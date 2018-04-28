@@ -1,6 +1,6 @@
 require("Globals")
 
-local tas = require("tas");
+local Tas = require("Tas");
 
 require("util")
 local Gui = require("Gui")
@@ -13,7 +13,7 @@ script.on_init( function()
     -- Instead collect the traceback in err and rethrow to display it in the main menu.
     local _, err = xpcall(function()
         log_error({"TAS-info-generic", "Calling script.on_init"}, true)
-        tas.init_globals()
+        Tas.init_globals()
         util.init_globals()
         global.gui_events = GuiEvents.new()
         global.gui = Gui.new(global.gui_events)
@@ -70,31 +70,31 @@ script.on_event(defines.events.on_gui_selection_state_changed, function(event)
 end )
 
 script.on_event(defines.events.on_built_entity, function(event)
-    local _, err = xpcall(tas.on_built_entity, debug.traceback, event)
+    local _, err = xpcall(Tas.on_built_entity, debug.traceback, event)
     if err then log_error { "TAS-exception-specific", "on_built_entity", err } end
 end )
 
 script.on_event(defines.events.on_pre_player_mined_item, function(event)
-    local _, err = xpcall(tas.on_pre_mined_entity, debug.traceback, event)
+    local _, err = xpcall(Tas.on_pre_mined_entity, debug.traceback, event)
     if err then log_error { "TAS-exception-specific", "on_preplayer_mined_item", err } end
 end )
 
 script.on_event(defines.events.on_robot_pre_mined, function(event)
-    local _, err = xpcall(tas.on_pre_mined_entity, debug.traceback, event)
+    local _, err = xpcall(Tas.on_pre_mined_entity, debug.traceback, event)
     if err then log_error { "TAS-exception-specific", "on_robot_pre_mined", err } end
 end )
 
 script.on_event(defines.events.on_player_crafted_item, function(event)
-    local _, err = xpcall(tas.on_crafted_item, debug.traceback, event)
+    local _, err = xpcall(Tas.on_crafted_item, debug.traceback, event)
     if err then log_error { "TAS-exception-specific", "on_crafted_item", err } end
 end )
 
 script.on_event("tas-select-hotkey", function(event)
-    local _, err = xpcall(tas.on_left_click, debug.traceback, event)
+    local _, err = xpcall(Tas.on_left_click, debug.traceback, event)
     if err then log_error { "TAS-exception-specific", "tas-select-hotkey", err } end
 end )
 
 script.on_event(defines.events.on_tick, function(event)
-    local _, err = xpcall(tas.on_tick, debug.traceback, event)
+    local _, err = xpcall(Tas.on_tick, debug.traceback, event)
     if err then log_error { "TAS-exception-specific", "on_tick", err } end
 end )

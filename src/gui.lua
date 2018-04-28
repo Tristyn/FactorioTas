@@ -3,7 +3,7 @@ local GuiEvents = require("GuiEvents")
 local MineOrderView = require("MineOrderView")
 local ItemGridView = require("ItemGridView")
 local ItemView = require("ItemView")
-local tas = require("tas")
+local Tas = require("Tas")
 
 local Gui = { }
 local metatable = { __index = Gui }
@@ -13,7 +13,7 @@ function Gui.set_metatable(instance)
 
     setmetatable(instance, metatable)
 
-    tas.set_metatable()
+    Tas.set_metatable()
     GuiEvents.set_metatable(instance.gui_events)
 
     for _, player_gui in pairs(instance.players) do
@@ -49,7 +49,7 @@ end
 function Gui:init_player(player_index)
     fail_if_missing(player_index)
 
-    tas.init_player(player_index)
+    Tas.init_player(player_index)
 
     local gui = { }
     self.players[player_index] = gui
@@ -233,7 +233,7 @@ function Gui:show_entity_editor(player_index, entity, character)
         local mine_order_exists = false
         local waypoint = global.players[player_index].waypoint
         if waypoint ~= nil then
-            if tas.find_mine_order_from_entity_and_waypoint(entity, waypoint) ~= nil then
+            if Tas.find_mine_order_from_entity_and_waypoint(entity, waypoint) ~= nil then
                 mine_order_exists = true
             end
         end
@@ -253,12 +253,12 @@ function Gui:_mine_checkbox_changed_callback(event)
     local entity = entity_editor.entity
 
     if mine_checkbox.state == true then
-        tas.add_mine_order(player_index, entity)
+        Tas.add_mine_order(player_index, entity)
     else
         local waypoint = global.players[player_index].waypoint
         if waypoint == nil then return end
-        local find_results = tas.find_mine_order_from_entity_and_waypoint(entity, waypoint)
-        tas.destroy_mine_order(find_results.mine_order)
+        local find_results = Tas.find_mine_order_from_entity_and_waypoint(entity, waypoint)
+        Tas.destroy_mine_order(find_results.mine_order)
     end
 end
 
@@ -307,7 +307,7 @@ function Gui:entity_info_transfer_inventory_clicked_callback(event)
 
     local item_stack_count = util.get_item_stack_split_count_from_click_event(click_event, item_stack)
 
-    tas.add_item_transfer_order(player_index, is_player_receiving, character_inventory_index, entity, entity_inventory_index, item_stack)
+    Tas.add_item_transfer_order(player_index, is_player_receiving, character_inventory_index, entity, entity_inventory_index, item_stack)
     self:refresh(player_index)
 end
 
@@ -434,7 +434,7 @@ function Gui:waypoint_editor_next_previous_clicked_callback(event)
     if new_selected_waypoint == nil then return end
 
 
-    tas.select_waypoint(player_index, new_selected_waypoint)
+    Tas.select_waypoint(player_index, new_selected_waypoint)
 
 end
 
@@ -444,7 +444,7 @@ function Gui:waypoint_editor_teleport_to_clicked_callback(event)
     local waypoint = gui.waypoint_editor.waypoint
     local player_entity = game.players[player_index]
 
-    local control = tas.find_freeroam_control(player_index)
+    local control = Tas.find_freeroam_control(player_index)
 
     -- this won't teleport a player in freeroam godmode
     if is_valid(control.character) == false then
@@ -468,7 +468,7 @@ function Gui:waypoint_editor_destroy_clicked_callback(event)
     local gui = self.players[player_index]
     local waypoint = gui.waypoint_editor.waypoint
 
-    tas.remove_waypoint(waypoint)
+    Tas.remove_waypoint(waypoint)
 
 end
 
@@ -610,18 +610,18 @@ function Gui:on_click(event)
     local gui = self.players[player_index]
 
     if element == gui.editor_visible_toggle then
-        tas.ensure_cheat_mode_enabled(player_index)
-        tas.ensure_first_sequence_initialized()
+        Tas.ensure_cheat_mode_enabled(player_index)
+        Tas.ensure_first_sequence_initialized()
         self:toggle_editor_visible(player_index)
     elseif element == gui.waypoint_mode then
         if gui.current_waypoint_build_mode == "move" then
             gui.current_waypoint_build_mode = "insert"
             gui.waypoint_mode.caption = "insert waypoint"
-            tas.set_waypoint_build_mode(player_index, "insert")
+            Tas.set_waypoint_build_mode(player_index, "insert")
         else
             gui.current_waypoint_build_mode = "move"
             gui.waypoint_mode.caption = "move waypoint"
-            tas.set_waypoint_build_mode(player_index, "move")
+            Tas.set_waypoint_build_mode(player_index, "move")
         end
     elseif element == gui.playback.play_pause then
         if element.caption == "play" then

@@ -8,41 +8,42 @@ local Constants = require("Constants")
 local Collections = require("collections")
 local PlayerControl = require("PlayerControl")
 
-local tas = { }
+local Tas = { }
+local metatable = { __index = Tas }
 
-function tas.init_globals()
+function Tas.init_globals()
     global.sequence_indexer = SequenceIndexer.new()
     global.playback_controller = PlaybackController.new()
     global.players = { }
 
-    global.sequence_indexer.sequence_collection_changed:add(tas, "_on_sequence_collection_changed")
-    global.sequence_indexer.sequence_changed:add(tas, "_on_sequence_changed")
+    global.sequence_indexer.sequence_collection_changed:add(Tas, "_on_sequence_collection_changed")
+    global.sequence_indexer.sequence_changed:add(Tas, "_on_sequence_changed")
 end
 
-function tas.set_metatable()
+function Tas.set_metatable()
     SequenceIndexer.set_metatable(global.sequence_indexer)
     PlaybackController.set_metatable(global.playback_controller)
 end
 
-function tas.init_player(player_index)
+function Tas.init_player(player_index)
     global.players[player_index] =
     {
         hover_arrows = { },
         waypoint_build_mode = "insert",
-        waypoint = nil -- set through events from tas.select_waypoint
+        waypoint = nil -- set through events from Tas.select_waypoint
     }
 
-    tas.ensure_true_spawn_position_set(game.players[player_index])
+    Tas.ensure_true_spawn_position_set(game.players[player_index])
 
     --  select the first waypoint if any exist
     if #global.sequence_indexer.sequences > 0 then
-        tas.select_waypoint(global.sequence_indexer.sequences[1].waypoints[1])
+        Tas.select_waypoint(global.sequence_indexer.sequences[1].waypoints[1])
     end
 end
 
 -- Creates and returns a static text entity that never despawns.
 -- If color is nil, the text will be white
-function tas.create_static_text(surface, position, content, color)
+function Tas.create_static_text(surface, position, content, color)
     local text = surface.create_entity
     {
         name = "flying-text",
@@ -57,7 +58,7 @@ function tas.create_static_text(surface, position, content, color)
     return text
 end
 
-function tas.ensure_true_spawn_position_set(freshly_spawned_player)
+function Tas.ensure_true_spawn_position_set(freshly_spawned_player)
     -- The spawn point for nauvis is 0,0 (or closest land to it)
     -- LuaForce::get_spawn_point doesn't help, it always returns 0,0 even if it is over water
     -- LuaSurface::find_non_colliding_position isn't accurate when precision is set to 1.0
@@ -74,7 +75,7 @@ end
 -- [Comment]
 -- Notifies the user and sets cheat mode to true if it is currently false.
 -- `player` can be a LuaPlayer, LuaCharacter or uint.
-function tas.ensure_cheat_mode_enabled(player)
+function Tas.ensure_cheat_mode_enabled(player)
     fail_if_missing(player)
 
     local player_entity = nil
@@ -95,23 +96,23 @@ function tas.ensure_cheat_mode_enabled(player)
 end
 
 -- creates a new sequence and returns it's index in the sequence table
-function tas.new_sequence()
+function Tas.new_sequence()
     local sequence = global.sequence_indexer:new_sequence()
     global.playback_controller:new_runner(sequence, defines.controllers.character)
 end
 
-function tas.ensure_first_sequence_initialized()
+function Tas.ensure_first_sequence_initialized()
     if #global.sequence_indexer.sequences > 0 then
         return
     end
 
     log_error({"TAS-info-specific", "Editor", "Placing the initial waypoint at spawn."}, true)
-    local sequence = tas.new_sequence()
+    local sequence = Tas.new_sequence()
 end
 
 -- scans a table for a value and returns its index
 -- returns nil if it doesn't exist
-function tas.scan_table_for_value(table, selector, value)
+function Tas.scan_table_for_value(table, selector, value)
     for key, val in pairs(table) do
         if value == selector(val) then
             return key
@@ -119,15 +120,15 @@ function tas.scan_table_for_value(table, selector, value)
     end
 end
 
-function tas.select_waypoints_in_sequences()
+function Tas.select_waypoints_in_sequences()
     return collections.select_many(global.sequence_indexer.sequences, function(sequence) return sequence.waypoints end)
 end
 
-function tas.find_waypoint_from_entity(waypoint_entity)
+function Tas.find_waypoint_from_entity(waypoint_entity)
     return global.sequence_indexer:find_waypoint_from_entity(waypoint_entity)
 end
 
-function tas.find_build_order_from_entity(ghost_entity)
+function Tas.find_build_order_from_entity(ghost_entity)
     fail_if_invalid(ghost_entity)
 
     local orders = global.sequence_indexer:find_orders_from_entity(ghost_entity, BuildOrder)
@@ -157,8 +158,8 @@ function tas.find_build_order_from_entity(ghost_entity)
     }
 end
 
-function tas.find_mine_order_from_entity_and_waypoint(entity, waypoint)
-    local key = tas.scan_table_for_value(waypoint.mine_orders, function(order) return order:get_entity() end, entity)
+function Tas.find_mine_order_from_entity_and_waypoint(entity, waypoint)
+    local key = Tas.scan_table_for_value(waypoint.mine_orders, function(order) return order:get_entity() end, entity)
 
     if key == nil then return nil end
 
@@ -168,12 +169,12 @@ function tas.find_mine_order_from_entity_and_waypoint(entity, waypoint)
     }
 end
 
-function tas.find_mine_orders_from_entity(entity)
+function Tas.find_mine_orders_from_entity(entity)
     local found = { }
 
     for sequence_index, sequence in ipairs(global.sequence_indexer.sequences) do
         for waypoint_index, waypoint in ipairs(sequence.waypoints) do
-            local indexes = tas.find_mine_order_from_entity_and_waypoint(entity, waypoint)
+            local indexes = Tas.find_mine_order_from_entity_and_waypoint(entity, waypoint)
             if indexes ~= nil then
                 indexes.sequence = sequence
                 indexes.sequence_index = sequence_index
@@ -187,7 +188,7 @@ function tas.find_mine_orders_from_entity(entity)
     return found
 end
 
-function tas.find_freeroam_control(player_index)
+function Tas.find_freeroam_control(player_index)
     fail_if_missing(player_index)
     -- if the freeroam character isn't being tracked by the playback
     -- controller than it must either be attached to the player or the player
@@ -202,12 +203,12 @@ function tas.find_freeroam_control(player_index)
     return control
 end
 
-function tas.is_waypoint_selected(player_index)
+function Tas.is_waypoint_selected(player_index)
     return global.players[player_index].waypoint ~= nil
 end
 
 -- Makes the player select a new waypoint
-function tas.select_waypoint(player_index, waypoint)
+function Tas.select_waypoint(player_index, waypoint)
     fail_if_missing(player_index)
     fail_if_missing(waypoint)
 
@@ -230,20 +231,20 @@ function tas.select_waypoint(player_index, waypoint)
     end
 end
 
-function tas.insert_waypoint(waypoint_entity, player_index)
+function Tas.insert_waypoint(waypoint_entity, player_index)
 
     local player = global.players[player_index]
     if player.waypoint ~= null then
         local sequence = player.waypoint.sequence
         local waypoint_insert_index = player.waypoint.index + 1
         local waypoint = sequence:insert_waypoint_from_entity(waypoint_insert_index, waypoint_entity)
-        tas.select_waypoint(player_index, waypoint)
+        Tas.select_waypoint(player_index, waypoint)
     end
     
 end
 
-function tas.on_built_waypoint(created_entity, player_index)
-    tas.ensure_first_sequence_initialized()
+function Tas.on_built_waypoint(created_entity, player_index)
+    Tas.ensure_first_sequence_initialized()
 
     local player = global.players[player_index]
 
@@ -256,19 +257,19 @@ function tas.on_built_waypoint(created_entity, player_index)
     if player.waypoint_build_mode == "move" then
         selected_waypoint:move_to_entity(created_entity)
     else
-        tas.insert_waypoint(created_entity, player_index)
+        Tas.insert_waypoint(created_entity, player_index)
     end
     
 end
 
-function tas.set_waypoint_build_mode(player_index, mode)
+function Tas.set_waypoint_build_mode(player_index, mode)
     if mode ~= "move" and mode ~= "insert" then
         error()
     end
     global.players[player_index].waypoint_build_mode = mode
 end
 
-function tas.destroy_mine_order(mine_order)
+function Tas.destroy_mine_order(mine_order)
 
     if mine_order.waypoint == nil then
         error("Orphan mine order")
@@ -279,8 +280,8 @@ function tas.destroy_mine_order(mine_order)
     return true
 end
 
-function tas.on_built_ghost(created_ghost, player_index)
-    if tas.is_waypoint_selected(player_index) == false then
+function Tas.on_built_ghost(created_ghost, player_index)
+    if Tas.is_waypoint_selected(player_index) == false then
         return
     end
 
@@ -293,25 +294,25 @@ function tas.on_built_ghost(created_ghost, player_index)
     player.waypoint:add_build_order_from_ghost_entity(created_ghost)
 end
 
-function tas.on_built_entity(event)
+function Tas.on_built_entity(event)
     local created_entity = event.created_entity
     local player_index = event.player_index
 
     if created_entity.name == "tas-waypoint" then
-        tas.on_built_waypoint(created_entity, player_index)
+        Tas.on_built_waypoint(created_entity, player_index)
     elseif created_entity.name == "entity-ghost" then
-        tas.on_built_ghost(created_entity, player_index)
+        Tas.on_built_ghost(created_entity, player_index)
     end
 end
 
-function tas.add_mine_order(player_index, entity)
-    if tas.is_waypoint_selected(player_index) == false then
+function Tas.add_mine_order(player_index, entity)
+    if Tas.is_waypoint_selected(player_index) == false then
         return
     end
 
     local player = global.players[player_index]
 
-    local find_result = tas.find_mine_order_from_entity_and_waypoint(entity, player.waypoint)
+    local find_result = Tas.find_mine_order_from_entity_and_waypoint(entity, player.waypoint)
 
     if find_result ~= nil then
         local mine_order = find_result.mine_order
@@ -321,19 +322,19 @@ function tas.add_mine_order(player_index, entity)
     else
         player.waypoint:add_mine_order_from_entity(entity)
 
-        tas.update_players_hover()
+        Tas.update_players_hover()
     end
 
     return true
 end
 
-function tas.on_pre_mined_resource(player_index, resource_entity)
+function Tas.on_pre_mined_resource(player_index, resource_entity)
 
     if global.playback_controller:is_player_controlled(player_index) then
         return
     end
 
-    if tas.add_mine_order(player_index, resource_entity) == true then
+    if Tas.add_mine_order(player_index, resource_entity) == true then
         -- undo the mine operation
         resource_entity.amount = resource_entity.amount + 1
     end        
@@ -341,7 +342,7 @@ function tas.on_pre_mined_resource(player_index, resource_entity)
     global.gui:refresh(player_index)
 end
 
-function tas.remove_waypoint(waypoint)
+function Tas.remove_waypoint(waypoint)
 
     if waypoint == nil then
         log_error{ "TAS-err-specific", "Editor", "Could not locate data for waypoint entity. This should never happen. Stacktrace: " .. debug.traceback() }
@@ -356,42 +357,42 @@ function tas.remove_waypoint(waypoint)
     waypoint.sequence:remove_waypoint(waypoint.index)
 end
 
-function tas.on_pre_removing_waypoint(waypoint_entity)
+function Tas.on_pre_removing_waypoint(waypoint_entity)
     local waypoint = global.sequence_indexer:find_waypoint_from_entity(waypoint_entity)
 
-    if tas.remove_waypoint(waypoint) == false then
+    if Tas.remove_waypoint(waypoint) == false then
         -- Removing failed but the factorio engine will still destroy the waypoint entity.
         -- Create a second waypoint at the exact same position to effectively counteract this.
         Waypoint.spawn_entity(game.surfaces[waypoint.surface_name], waypoint.position)
     end
 end
 
-function tas.on_pre_removing_ghost(ghost_entity)
-    local find_result = tas.find_build_order_from_entity(ghost_entity)
+function Tas.on_pre_removing_ghost(ghost_entity)
+    local find_result = Tas.find_build_order_from_entity(ghost_entity)
 
     if find_result == nil then return end
     find_result.waypoint:remove_build_order(find_result.build_order.index)
 end
 
-function tas.on_pre_mined_entity(event)
+function Tas.on_pre_mined_entity(event)
     local robot = event.robot
     local entity = event.entity
 
     if entity.name == "tas-waypoint" then
-        tas.on_pre_removing_waypoint(entity)
+        Tas.on_pre_removing_waypoint(entity)
     elseif entity.name == "entity-ghost" then
         -- Note: factorio doesn't fire this event if a player builds on top of a ghost
-        tas.on_pre_removing_ghost(entity)
+        Tas.on_pre_removing_ghost(entity)
     elseif entity.type == "resource" then
         if global.playback_controller:is_player_controlled(player_index) then
-            tas.on_pre_mined_resource(event.player_index, entity)
+            Tas.on_pre_mined_resource(event.player_index, entity)
         end
     end
 
 end
 
-function tas.add_item_transfer_order(player_index, is_player_receiving, player_inventory_index, container_entity, container_inventory_index, items_to_transfer)
-    if tas.is_waypoint_selected(player_index) == false then
+function Tas.add_item_transfer_order(player_index, is_player_receiving, player_inventory_index, container_entity, container_inventory_index, items_to_transfer)
+    if Tas.is_waypoint_selected(player_index) == false then
         return false
     end
     
@@ -399,13 +400,13 @@ function tas.add_item_transfer_order(player_index, is_player_receiving, player_i
     waypoint:add_item_transfer_order(is_player_receiving, player_inventory_index, container_entity, container_inventory_index, items_to_transfer)
 end
 
-function tas.destroy_item_transfer_order(item_transfer_order)
+function Tas.destroy_item_transfer_order(item_transfer_order)
     item_transfer_order.waypoint:remove_item_transfer_order(item_transfer_order.index)
 
     return true
 end
 
-function tas.on_crafted_item(event)
+function Tas.on_crafted_item(event)
     local item_stack = event.item_stack
     local player_index = event.player_index
     local player_entity = game.players[player_index]
@@ -414,7 +415,7 @@ function tas.on_crafted_item(event)
         return
     end
 
-    if tas.is_waypoint_selected(player_index) == false then
+    if Tas.is_waypoint_selected(player_index) == false then
         return
     end
 
@@ -437,7 +438,7 @@ function tas.on_crafted_item(event)
         error("No support for crafting recipes with zero or multiple products.")
     end
 
-    if tas.is_waypoint_selected(player_index) == false then
+    if Tas.is_waypoint_selected(player_index) == false then
         error("Could not create a craft order because no waypoint was selected.")
     end
 
@@ -449,32 +450,32 @@ function tas.on_crafted_item(event)
 
 end
 
-function tas.on_clicked_waypoint(player_index, waypoint_entity)
+function Tas.on_clicked_waypoint(player_index, waypoint_entity)
     local waypoint = global.sequence_indexer:find_waypoint_from_entity(waypoint_entity)
     
     fail_if_missing(waypoint, "Orphan Waypoint")
 
-    tas.select_waypoint(player_index, waypoint)
+    Tas.select_waypoint(player_index, waypoint)
 end
 
-function tas.on_clicked_ghost(player_index, ghost_entity)
-    if tas.is_waypoint_selected(player_index) == false then
-        local build_order_indexes = tas.find_build_order_from_entity(ghost_entity)
+function Tas.on_clicked_ghost(player_index, ghost_entity)
+    if Tas.is_waypoint_selected(player_index) == false then
+        local build_order_indexes = Tas.find_build_order_from_entity(ghost_entity)
         if build_order_indexes == nil then 
             log_error({"TAS-warn-specific", "Editor", "no build order for this ghost"}, true)
             return 
         end
-        tas.select_waypoint(player_index, build_order_indexes.waypoint)
+        Tas.select_waypoint(player_index, build_order_indexes.waypoint)
     end
-    tas.show_entity_editor(player_index, ghost_entity)
+    Tas.show_entity_editor(player_index, ghost_entity)
 end
 
-function tas.on_clicked_generic_entity(player_index, entity)
-    tas.show_entity_editor(player_index, entity)
+function Tas.on_clicked_generic_entity(player_index, entity)
+    Tas.show_entity_editor(player_index, entity)
 end
 
-function tas.show_entity_editor(player_index, entity)
-    if tas.is_waypoint_selected(player_index)  == false then
+function Tas.show_entity_editor(player_index, entity)
+    if Tas.is_waypoint_selected(player_index)  == false then
         return
     end
 
@@ -483,7 +484,7 @@ function tas.show_entity_editor(player_index, entity)
     global.gui:show_entity_editor(player_index, entity, character)
 end
 
-function tas.on_left_click(event)
+function Tas.on_left_click(event)
     local player_index = event.player_index
     local player = game.players[player_index]
     
@@ -493,15 +494,15 @@ function tas.on_left_click(event)
     local entity_name = entity.name
 
     if entity_name == "tas-waypoint" then
-        tas.on_clicked_waypoint(player_index, entity)
+        Tas.on_clicked_waypoint(player_index, entity)
     elseif entity_name == "entity-ghost" then
-        tas.on_clicked_ghost(player_index, entity)
+        Tas.on_clicked_ghost(player_index, entity)
     else
-        tas.on_clicked_generic_entity(player_index, entity)
+        Tas.on_clicked_generic_entity(player_index, entity)
     end
 end
 
-function tas.update_player_hover(player, player_entity)
+function Tas.update_player_hover(player, player_entity)
 
     -- delete arrow collection
     for _, arrow in pairs(player.hover_arrows) do
@@ -520,7 +521,7 @@ function tas.update_player_hover(player, player_entity)
     
 
     -- check if it's a build order
-    local find_result = tas.find_build_order_from_entity(selected)
+    local find_result = Tas.find_build_order_from_entity(selected)
     if find_result ~= nil then
         local build_order_entity = find_result.build_order:get_entity()
         local waypoint_entity = find_result.waypoint:get_entity()
@@ -565,7 +566,7 @@ function tas.update_player_hover(player, player_entity)
 
     else -- generic entity, check if it is referenced by any mine orders
 
-        local orders = tas.find_mine_orders_from_entity(selected)
+        local orders = Tas.find_mine_orders_from_entity(selected)
         if #orders > 0 then
             for _, indexes in ipairs(orders) do
                 local mine_order_entity = indexes.mine_order:get_entity()
@@ -579,33 +580,33 @@ function tas.update_player_hover(player, player_entity)
     end
 end
 
-function tas.update_players_hover()
+function Tas.update_players_hover()
     for player_index, player_entity in pairs(game.connected_players) do
         local player = global.players[player_index]
-        tas.update_player_hover(player, player_entity)
+        Tas.update_player_hover(player, player_entity)
     end
 end
 
-function tas.is_player_hover_target_changed(player, player_entity)
+function Tas.is_player_hover_target_changed(player, player_entity)
     return player.hover_entity ~= player_entity.selected
 end
 
-function tas.check_player_hovering_entities(player_index)
+function Tas.check_player_hovering_entities(player_index)
     local player_entity = game.players[player_index]
     local player = global.players[player_index]
 
-    if tas.is_player_hover_target_changed(player, player_entity) then
-        tas.update_player_hover(player, player_entity)
+    if Tas.is_player_hover_target_changed(player, player_entity) then
+        Tas.update_player_hover(player, player_entity)
     end
 end
 
-function tas.check_players_hovering_entities()
+function Tas.check_players_hovering_entities()
     for player_index, player in pairs(game.connected_players) do
-        tas.check_player_hovering_entities(player_index)
+        Tas.check_player_hovering_entities(player_index)
     end
 end
 
-function tas.update_hover_arrows()
+function Tas.update_hover_arrows()
 
     for _, player in pairs(global.players) do
         local arrows_to_remove = { }
@@ -625,9 +626,9 @@ function tas.update_hover_arrows()
 
 end
 
-function tas._on_sequence_collection_changed(self, event)
+function Tas._on_sequence_collection_changed(self, event)
     if event.type == "add_sequence" then
-        tas.select_waypoint(event.sequence.waypoints[1])
+        Tas.select_waypoint(event.sequence.waypoints[1])
     elseif event.type == "remove_sequence" then
         for index, player in pairs(global.players) do
             if player.waypoint.sequence == event.sequence then
@@ -637,18 +638,18 @@ function tas._on_sequence_collection_changed(self, event)
                     waypoint_to_select = sequence.waypoints[1]
                 end
 
-                tas.select_waypoint(index, waypoint_to_select)
+                Tas.select_waypoint(index, waypoint_to_select)
             end
         end
     end
 end
 
-function tas._on_sequence_changed(self, event)
+function Tas._on_sequence_changed(self, event)
     
     if event.type == "add_waypoint" then
         for index, player in pairs(global.players) do
             if player.waypoint == nil then
-                tas.select_waypoint(index, event.waypoint)
+                Tas.select_waypoint(index, event.waypoint)
             end
         end
     elseif event.type == "remove_waypoint" then
@@ -657,18 +658,18 @@ function tas._on_sequence_changed(self, event)
                 -- select a new waypoint
                 local waypoints = event.sender.waypoints
                 local selected_waypoint = waypoints[math.min(event.waypoint.index, #waypoints)]
-                tas.select_waypoint(index, selected_waypoint)
+                Tas.select_waypoint(index, selected_waypoint)
             end
         end
     end
 end
 
-function tas.on_tick(event)
-    tas.check_players_hovering_entities()
+function Tas.on_tick(event)
+    Tas.check_players_hovering_entities()
 
-    tas.update_hover_arrows()
+    Tas.update_hover_arrows()
 
     global.playback_controller:on_tick()
 end
 
-return tas
+return Tas
