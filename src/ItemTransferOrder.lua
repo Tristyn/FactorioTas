@@ -112,7 +112,6 @@ end
 function ItemTransferOrder:set_count(value)
 	fail_if_missing(value)
 	if value < 1 then error("Out of range")	end
-	if value ~= mathex.round(value) then error("Fractional count") end
 
 	self.item_stack.count = value
 end

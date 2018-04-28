@@ -88,7 +88,7 @@ function ItemGridView:_item_changed_handler(event)
 		item_click_event = event
 	}
 
-	self.changed:invoke(event)
+	self.changed:invoke(wrapper_event)
 end
 
 function ItemGridView:dispose()

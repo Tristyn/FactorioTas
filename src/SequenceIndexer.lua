@@ -9,7 +9,20 @@ local CraftOrder = require("CraftOrder")
 local Event = require("Event")
 local Set = require("Set")
 
-local SequenceIndexer = { }
+local SequenceIndexer = {
+
+	
+	-- lua prototypes are recreated each time the maps loads and any prototypes
+	-- that are used as keys in self._order_indexes are the old instances which were serialized.
+	-- It would be nice to use prototypes as keys but tables would have to be rekeyed
+	-- during set_metatable, which is difficult when old keys are unknown.
+	-- The solution here is to map the prototype to a number enum type which has better persistence properties
+	_order_type_to_order_index_key = {
+		[MineOrder] = 1,
+		[BuildOrder] = 2,
+		[ItemTransferOrder] = 3
+	}
+}
 local metatable = { __index = SequenceIndexer }
 
 function SequenceIndexer.set_metatable(instance)
@@ -38,9 +51,9 @@ function SequenceIndexer.new()
 	local new = {
 		_waypoint_index = { },
 		_order_indexes = {
-			[MineOrder] = { },
-			[BuildOrder] = { },
-			[ItemTransferOrder] = { }
+			[SequenceIndexer._order_type_to_order_index_key[MineOrder]] = { },
+			[SequenceIndexer._order_type_to_order_index_key[BuildOrder]] = { },
+			[SequenceIndexer._order_type_to_order_index_key[ItemTransferOrder]] = { }
 			-- craft orders don't get indexed, they aren't
 			-- tied to any entity other than the character
 		},
@@ -195,7 +208,7 @@ function SequenceIndexer:_on_waypoint_changed(event)
 end
 
 function SequenceIndexer:_add_order(order, order_type)
-	local indexes = self._order_indexes[order_type]
+	local indexes = self._order_indexes[SequenceIndexer._order_type_to_order_index_key[order_type]]
 
 	if indexes ~= nil then
 		local index = order:get_entity_id()
@@ -218,7 +231,7 @@ function SequenceIndexer:_add_order(order, order_type)
 end
 
 function SequenceIndexer:_remove_order(order, order_type)
-	local indexes = self._order_indexes[order_type]
+	local indexes = self._order_indexes[SequenceIndexer._order_type_to_order_index_key[order_type]]
 
 	if indexes ~= nil then
 		local index = order:get_entity_id()
@@ -229,7 +242,7 @@ function SequenceIndexer:_remove_order(order, order_type)
 		end
 
 		if orders_for_id:remove(order) == false then
-			log_error{ "TAS-err-generic", "order removed to SequenceIndexer that wasn't added, this shouldn't happen."}
+			log_error{ "TAS-err-generic", "order removed from SequenceIndexer that wasn't added, this shouldn't happen."}
 		end
 
 		if #orders_for_id == 0 then
@@ -252,7 +265,7 @@ function SequenceIndexer:find_waypoint_from_entity(waypoint_entity)
 end
 
 function SequenceIndexer:find_orders_from_entity(entity, order_type)
-	local indexes = self._order_indexes[order_type]
+	local indexes = self._order_indexes[SequenceIndexer._order_type_to_order_index_key[order_type]]
 
 	if indexes == nil then
 		error("Order type not supported.")

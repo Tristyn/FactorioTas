@@ -39,12 +39,24 @@ function fail_if_invalid(entity, msg)
     return false
 end
 
-function log_error(msg)
-    game.print(msg) -- chat
-    game.write_file("tas-log.txt", serpent.block(msg), true) -- log file
+function log_error(msg, exclude_stack_trace)
+    local stacktrace = debug.traceback(nil, 2)
+
+    if game ~= nil then
+        game.print(msg) -- chat
+        game.write_file("tas-log.txt", serpent.block(msg), true) -- log file
+    end
     -- game.write_file can't do localizable strings like game.print
     -- we gotta dispatch our best monkeys to work on it
     log(msg) -- stdout
+
+    if(exclude_stack_trace ~= true) then
+        if game ~= nil then
+            game.print(stacktrace)
+            game.write_file("tas-log.txt", stacktrace, true)
+        end
+        log(stacktrace)
+    end
 
 
     -- log("foo") will produce: 118.767 Script log("foo"):1: foo

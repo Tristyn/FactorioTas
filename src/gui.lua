@@ -17,13 +17,19 @@ function Gui.set_metatable(instance)
     GuiEvents.set_metatable(instance.gui_events)
 
     for _, player_gui in pairs(instance.players) do
-        for _, mine_order_view in ipairs(player_gui.waypoint_editor.mine_orders) do
+        for _, mine_order_view in ipairs(player_gui.waypoint_editor.mine_order_views) do
             MineOrderView.set_metatable(mine_order_view)
         end
 
-        ItemGridView.set_metatable(player_gui.waypoint_editor.crafting_queue)
-        ItemGridView.set_metatable(player_gui.entity_editor.character_inventory.item_grid)
-        ItemGridView.set_metatable(player_gui.entity_editor.entity_inventory.item_grid)
+        if player_gui.waypoint_editor.crafting_queue ~= nil then
+            ItemGridView.set_metatable(player_gui.waypoint_editor.crafting_queue)
+        end
+        if player_gui.entity_editor.character_inventory.item_grid ~= nil then
+            ItemGridView.set_metatable(player_gui.entity_editor.character_inventory.item_grid)
+        end
+        if player_gui.entity_editor.entity_inventory.item_grid ~= nil then
+            ItemGridView.set_metatable(player_gui.entity_editor.entity_inventory.item_grid)
+        end
     end
 
 end
@@ -57,16 +63,19 @@ function Gui:init_player(player_index)
     gui.entity_editor = {
         container = gui.root.add { type = "flow", direction = "vertical" },
         entity_inventory = {
-            selected_inventory_index = 1
+            selected_inventory_index = 1,
+            item_grid = nil
         },
         character_inventory = {
-            selected_inventory_index = 1
+            selected_inventory_index = 1,
+            item_grid = nil
         }
     }
     gui.waypoint_container = gui.root.add { type = "flow", direction = "vertical" }
     gui.waypoint_editor = {
         item_transfer_rows = { },
-        mine_order_views = { }
+        mine_order_views = { },
+        crafting_queue = nil
     }
 
     -- Editor constructor
@@ -396,7 +405,7 @@ function Gui:show_waypoint_editor(player_index, waypoint)
             end
 
             item_transfer_row.reveal_entity_button = self:build_inventory_item_control(item_transfer_table, { name = order.container_name, count = 0 } , "entity/")
-            item_transfer_row.reveal_entity_button = ItemView
+            --item_transfer_row.reveal_entity_button = ItemView
             item_transfer_table.add { type = "sprite", sprite = transfer_direction_sprite}
             item_transfer_row.increment_button = self:build_inventory_item_control(item_transfer_table, order.item_stack, "item/")
             item_transfer_row.decrement_button = item_transfer_table.add { type = "sprite-button", sprite = "tas-decrement"--[[, style = "button-style"--]]}
@@ -439,18 +448,18 @@ function Gui:waypoint_editor_teleport_to_clicked_callback(event)
 
     -- this won't teleport a player in freeroam godmode
     if is_valid(control.character) == false then
-        log_error({"TAS-err-specific", "Editor", "Can't teleport god-mode players at the moment."})
+        log_error({"TAS-warn-specific", "Editor", "Can't teleport god-mode players at the moment."})
         return
     end
 
     if control.character ~= player_entity.character and waypoint.surface_name ~= player_entity.surface.name then
-        log_error({"TAS-err-specific", "Editor", "Factorio 0.16.37 Engine Limitation: Surface teleport can only be done for players at the moment."})
+        log_error({"TAS-warn-specific", "Editor", "Factorio 0.16.37 Engine Limitation: Surface teleport can only be done for characters that are controled by players at the moment."})
         return
     end
     
     -- ideally we'd pass the control.character if it weren't for engine limitations
     if waypoint:try_teleport_here(player_entity) == false then
-        log_error({"TAS-err-specific", "Editor", "Player teleport action failed."})
+        log_error({"TAS-warn-specific", "Editor", "Player teleport action failed."})
     end
 end
 
@@ -474,7 +483,7 @@ function Gui:crafting_queue_item_clicked_callback(event)
     local craft_order = waypoint.craft_orders[event.item_stack_index]
     
 
-    local items_to_remove = util.get_crafting_count_from_click_event(click_event, craft_order.get_recipe())
+    local items_to_remove = util.get_crafting_count_from_click_event(click_event, craft_order:get_recipe())
 
     if craft_order:get_count() > items_to_remove then
         craft_order:set_count(craft_order:get_count() - items_to_remove)

@@ -105,7 +105,7 @@ function tas.ensure_first_sequence_initialized()
         return
     end
 
-    log_error{"TAS-info-specific", "Editor", "Placing the initial waypoint at spawn."}
+    log_error({"TAS-info-specific", "Editor", "Placing the initial waypoint at spawn."}, true)
     local sequence = tas.new_sequence()
 end
 
@@ -349,7 +349,7 @@ function tas.remove_waypoint(waypoint)
     end
 
     if waypoint.sequence:can_remove_waypoint(waypoint.index) == false then
-        log_error{ "TAS-info-specific", "Editor", "Can't remove the only waypoint in the sequence." }
+        log_error({ "TAS-info-specific", "Editor", "Can't remove the only waypoint in the sequence." }, true)
         return false
     end
 
@@ -418,10 +418,13 @@ function tas.on_crafted_item(event)
         return
     end
 
-    -- Determine the crafting recipe and store it as a runner crafting order
-    -- This event is for each item crafted as well as what was clicked ("iron-axe" triggers
-    -- both "iron-stick" with a count of 2 and "iron-axe" with a count of 1, assuming no "iron-sticks" are in the player's inventory)
-    -- The trick to determine the top-level recipe is to set player.cheat_mode=true so that on_crafted_item fires exactly once when clicking the button to craft.
+    -- Determine the crafting recipe and store it as a CraftOrder in the
+    -- waypoint. This event is for each item crafted as well as what was
+    -- clicked ("iron-axe" triggers both "iron-stick" with a count of
+    -- 2 and "iron-axe" with a count of 1, assuming no "iron-sticks"
+    -- are in the player's inventory) The trick to determine the 
+    -- top-level recipe is to set player.cheat_mode=true so that
+    -- on_crafted_item fires exactly once when clicking the button to craft.
 
     -- Only works in factorio 0.15+ -- recipe = event.recipe
     local recipe = game.players[player_index].force.recipes[item_stack.name]
@@ -458,7 +461,7 @@ function tas.on_clicked_ghost(player_index, ghost_entity)
     if tas.is_waypoint_selected(player_index) == false then
         local build_order_indexes = tas.find_build_order_from_entity(ghost_entity)
         if build_order_indexes == nil then 
-            log_error{"TAS-err-specific", "Editor", "no build order for this ghost"} 
+            log_error({"TAS-warn-specific", "Editor", "no build order for this ghost"}, true)
             return 
         end
         tas.select_waypoint(player_index, build_order_indexes.waypoint)

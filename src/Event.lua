@@ -103,7 +103,7 @@ function Event:invoke(...)
 	assert(self.reentry_count >= 0)
 
 	if err then
-		log_error (inspect(err))
+		log_error ({"TAS-err-generic", "Unhandled exception in event handler" .. serpent.block(err)})
 	end
 	--self:_verify()
 end

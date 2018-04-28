@@ -495,12 +495,31 @@ end
 function util.get_crafting_count_from_click_event(click_event, recipe_prototype_or_name)
     fail_if_missing(click_event)
     fail_if_missing(recipe_prototype_or_name)
-    local item_type = type(item_stack_or_name)
-    local stack_size = util.get_item_count(item_stack_or_name)
 
     if click_event.button == defines.mouse_button_type.left and click_event.control == false then
         if click_event.shift == true then
-            return stack_size
+            local main_product = nil
+            if type(recipe_prototype_or_name) == "string" then
+                main_product = game.players[player_index].force.recipes[recipe_prototype_or_name].products[1]
+            else
+                main_product = recipe_prototype_or_name.products[1] 
+            end
+
+            if main_product ~= nil then
+                local product_stack_size
+                if main_product.type == "item" then
+                    product_stack_size = game.item_prototypes[main_product.name]
+                elseif main_product.type == "fluid" then
+                    product_stack_size = game.fluid_prototypes[main_product.name]
+                else
+                    log_error({"TAS-warning-specific", "Editor", "Unknown recipe result type '" .. main_product.type .. "'."})
+                    return 50
+                end
+                
+                return product_stack_size / main_product.amount
+            else
+                return 50
+            end
         else
             return 1
         end
@@ -508,6 +527,29 @@ function util.get_crafting_count_from_click_event(click_event, recipe_prototype_
         return 5
     else 
         return 0
+    end
+end
+
+function util.get_crafting_count_from_craft_event(craft_event)
+    local player_index = craft_event.player_index
+    local item_stack = craft_event.item_stack
+
+    local recipe = game.players[player_index].force.recipes[item_stack.name]
+    local main_product = recipe.products[1]
+    
+    if main_product ~= nil then
+        local product_stack_size
+        if main_product.type == "item" then
+            product_stack_size = game.item_prototypes[main_product.name]
+        elseif main_product.type == "fluid" then
+            product_stack_size = game.fluid_prototypes[main_product.name]
+        else
+            log_error({"TAS-warning-specific", "Editor", "Unknown product prototype '" .. main_product.type .. "'."})
+            return 50
+        end
+        return product_stack_size / main_product.amount
+    else
+        return 50
     end
 end
 

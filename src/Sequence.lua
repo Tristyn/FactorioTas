@@ -26,8 +26,11 @@ function Sequence.new()
     
 	Sequence.set_metatable(sequence)
 
-    local origin = { x = 0, y = 0 }
-    local new_waypoint = sequence:insert_waypoint(1, "nauvis", origin)
+    local spawn = global.true_spawn_position
+    if spawn == nil then
+        error()
+    end
+    local new_waypoint = sequence:insert_waypoint(1, "nauvis", spawn)
     if new_waypoint == nil then
         
         log_error{"TAS-err-generic", "Could not create a waypoint at spawn because one already exists there."}
